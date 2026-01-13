@@ -17,8 +17,7 @@ Future<void> main() async {
   // }
 
   const supabaseUrl = 'https://jpysitnnnopomrgjbaxq.supabase.co';
-  const supabaseKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpweXNpdG5ubm9wb21yZ2piYXhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyODcwNzksImV4cCI6MjA4Mzg2MzA3OX0.1hgMbhmxSM2azb-0OofxamVL5smpPwm-3ZadlQv_JqA';
+  const supabaseKey = 'sb_publishable_2ydfHF0FqCYOr5ZQ5NZ4QQ_UUDvboCo';
 
   if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
     debugPrint("CRITICAL: Supabase credentials missing!");

@@ -1,11 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from supabase import create_client, Client
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+from database import supabase
+from deps import get_current_user
 
 app = FastAPI()
 
@@ -17,25 +14,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize Supabase
-url: str = os.getenv("SUPABASE_URL")
-key: str = os.getenv("SUPABASE_KEY")
-
-print(f"DEBUG: Loading Supabase...")
-print(f"DEBUG: URL found? {bool(url)}")
-print(f"DEBUG: KEY found? {bool(key)}")
-
-# For now, we'll initialize conditionally to avoid crashing if env vars aren't set yet
-supabase: Client = None
-if url and key:
-    try:
-        supabase = create_client(url, key)
-        print("DEBUG: Supabase Client Initialized Successfully!")
-    except Exception as e:
-        print(f"DEBUG: Failed to init Supabase: {e}")
-else:
-    print("DEBUG: Missing URL or KEY - Supabase will remain None.")
 
 @app.get("/")
 def read_root():
@@ -103,11 +81,14 @@ def place_order(order: OrderRequest):
 # --- KDS ENDPOINTS ---
 
 @app.get("/kds/orders")
-def get_kds_orders():
-    """Fetch active orders for the Kitchen Display System (pending or prep)"""
+def get_kds_orders(user = Depends(get_current_user)):
+    """Fetch active orders for the Kitchen Display System (pending or prep). Requires Auth."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
+    # Optional: Check if user belongs to the establishment (future improvement)
+    # est_id = user.user_metadata.get('establishment_id')
+
     try:
         # Fetch orders with status 'pending' or 'prep'
         # We fetch related items and products for display
@@ -126,8 +107,8 @@ class StatusUpdateRequests(BaseModel):
     status: str
 
 @app.patch("/kds/orders/{order_id}")
-def update_order_status(order_id: str, request: StatusUpdateRequests):
-    """Update order status (e.g. pending -> prep -> ready)"""
+def update_order_status(order_id: str, request: StatusUpdateRequests, user = Depends(get_current_user)):
+    """Update order status (e.g. pending -> prep -> ready). Requires Auth."""
     if not supabase:
          raise HTTPException(status_code=500, detail="Supabase not configured")
 

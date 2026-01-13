@@ -65,13 +65,28 @@ class _KitchenScreenState extends State<KitchenScreen> {
   // Fetch active orders (pending, prep) via BACKEND API (Bypasses RLS)
   Future<List<Map<String, dynamic>>> _fetchActiveOrders() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/kds/orders'));
+      final session = _supabase.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('Kitchen: No Active Session!');
+        return [];
+      }
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/kds/orders'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return List<Map<String, dynamic>>.from(data);
       } else {
-        debugPrint('Error fetching orders: ${response.statusCode}');
+        debugPrint(
+            'Error fetching orders: ${response.statusCode} ${response.body}');
         return [];
       }
     } catch (e) {
@@ -82,10 +97,25 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
   Future<void> _updateStatus(String orderId, String newStatus) async {
     try {
+      final session = _supabase.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Not Authenticated!')),
+          );
+        }
+        return;
+      }
+
       // Use Backend API for updates too
       final response = await http.patch(
         Uri.parse('$_baseUrl/kds/orders/$orderId'),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json"
+        },
         body: jsonEncode({"status": newStatus}),
       );
 
@@ -111,8 +141,121 @@ class _KitchenScreenState extends State<KitchenScreen> {
     }
   }
 
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _signIn() async {
+    setState(() => _isLoading = true);
+    try {
+      await _supabase.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      if (mounted) {
+        setState(() {}); // Rebuild to show orders
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Login Failed: ${e.message}'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signOut() async {
+    await _supabase.auth.signOut();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    final session = _supabase.auth.currentSession;
+
+    // Show Login Screen if no session
+    if (session == null) {
+      return Scaffold(
+        appBar: AppBar(
+            title: const Text('Kitchen Login'),
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white),
+        backgroundColor: const Color(0xFF1a1a1a),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Card(
+              color: Colors.grey[900],
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.lock_outline,
+                        size: 64, color: Colors.white),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _emailController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white30)),
+                        focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white)),
+                        prefixIcon: Icon(Icons.email, color: Colors.white54),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white30)),
+                        focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white)),
+                        prefixIcon: Icon(Icons.lock, color: Colors.white54),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.all(16)),
+                        onPressed: _isLoading ? null : _signIn,
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text('LOGIN TO KITCHEN'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kitchen Display (Hybrid 🔌)'),
@@ -122,6 +265,10 @@ class _KitchenScreenState extends State<KitchenScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => setState(() {}),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _signOut,
           )
         ],
       ),
