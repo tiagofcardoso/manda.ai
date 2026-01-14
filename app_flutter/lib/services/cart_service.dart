@@ -8,7 +8,22 @@ class CartService {
   factory CartService() => _instance;
   CartService._internal();
 
+  String? _tableId;
+  String? _deliveryAddress;
+
   final ValueNotifier<List<CartItem>> itemsNotifier = ValueNotifier([]);
+
+  String? get tableId => _tableId;
+
+  void setTableId(String id) {
+    _tableId = id;
+    _deliveryAddress = null; // Reset delivery address if table is set
+  }
+
+  void setDeliveryAddress(String address) {
+    _deliveryAddress = address;
+    _tableId = null; // Reset table if delivery is set
+  }
 
   List<CartItem> get items => itemsNotifier.value;
 

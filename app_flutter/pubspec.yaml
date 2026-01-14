@@ -44,6 +44,13 @@ dependencies:
     sdk: flutter
   lucide_icons: ^0.257.0
   fl_chart: ^0.69.0
+  image_picker: ^1.1.2
+  mime: ^2.0.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^13.0.2
+  permission_handler: ^11.3.1
+  flutter_map_cancellable_tile_provider: ^3.0.2
 
 
 # ...

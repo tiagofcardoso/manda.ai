@@ -21,7 +21,7 @@ def read_root():
     return {"message": "Manda.AI Backend is running"}
 
 class OrderRequest(BaseModel):
-    table_id: str
+    table_id: str | None = None
     items: list
     total: float
 
@@ -31,27 +31,55 @@ def place_order(order: OrderRequest):
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
     try:
-        # 1. Get Establishment ID from Table ID
-        # (In a real app, we'd cache this or send it from frontend)
-        table_res = supabase.table("tables").select("establishment_id").eq("id", order.table_id).execute()
-        
-        # Fallback for dev: if table lookup fails (e.g. using dummy ID), try to get ANY establishment
         establishment_id = None
-        if table_res.data:
-             establishment_id = table_res.data[0]['establishment_id']
-        else:
-             # AUTO-FIX for Dev: Just grab the first establishment
+        
+        # 1. Try to get Establishment from Table if provided
+        # 1. Try to get Establishment from Table if provided
+        if order.table_id:
+             # Handle short "Table Number" (e.g. "5")
+            if len(order.table_id) < 10:
+                print(f"Resolving Table Number: {order.table_id}")
+                # Try finding the table by number. Note: table_number might be "05" or "5".
+                # We'll try exact match first.
+                table_res = supabase.table("tables").select("id, establishment_id").eq("table_number", order.table_id).execute()
+                
+                # If not found, try padding with 0 (e.g. "5" -> "05")
+                if not table_res.data and len(order.table_id) == 1:
+                     padded = f"0{order.table_id}"
+                     table_res = supabase.table("tables").select("id, establishment_id").eq("table_number", padded).execute()
+                     
+                if table_res.data:
+                    print(f"Resolved to UUID: {table_res.data[0]['id']}")
+                    order.table_id = table_res.data[0]['id'] # Replace with real UUID
+                    establishment_id = table_res.data[0]['establishment_id']
+                else:
+                    print(f"Table {order.table_id} not found. Falling back to Delivery Mode.")
+                    order.table_id = None # Invalid table number -> convert to Delivery
+            else:
+                # UUID provided
+                try:
+                    table_res = supabase.table("tables").select("establishment_id").eq("id", order.table_id).execute()
+                    if table_res.data:
+                        establishment_id = table_res.data[0]['establishment_id']
+                except Exception as e:
+                     print(f"Error querying table UUID: {e}")
+                     order.table_id = None
+        
+        # 2. Fallback / Default logic (for Delivery or invalid table)
+        if not establishment_id:
+             # Just grab the first establishment (Dev mode shortcut)
+             # In production, we should probably require establishment_id in the request
              est_res = supabase.table("establishments").select("id").limit(1).execute()
              if est_res.data:
                  establishment_id = est_res.data[0]['id']
         
         if not establishment_id:
-             raise HTTPException(status_code=400, detail="Invalid Table/Establishment")
+             raise HTTPException(status_code=400, detail="Invalid Establishment (No default found)")
 
-        # 2. Create Order
+        # 3. Create Order
         order_data = {
             "establishment_id": establishment_id,
-            "table_id": order.table_id if table_res.data else None, # Nullable if pseudo-table
+            "table_id": order.table_id, # Can be None
             "total_amount": order.total,
             "status": "pending"
         }
@@ -72,6 +100,16 @@ def place_order(order: OrderRequest):
         
         if items_data:
             supabase.table("order_items").insert(items_data).execute()
+
+        # 4. Auto-Create Delivery Request if it's a Delivery Order (No Table)
+        if not order.table_id:
+             delivery_data = {
+                 "order_id": order_id,
+                 "status": "open",
+                 "current_lat": 38.7223, # Shop location
+                 "current_lng": -9.1393 
+             }
+             supabase.table("deliveries").insert(delivery_data).execute()
 
         return {"status": "success", "order_id": order_id}
 
@@ -292,4 +330,114 @@ def get_top_products(limit: int = 5):
 
     except Exception as e:
         print(f"Error fetching top products: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- DELIVERY ENDPOINTS ---
+
+class DeliveryRequest(BaseModel):
+    order_id: str
+    driver_name: str | None = None # If None, it goes to Pool
+    driver_id: str | None = None
+
+@app.post("/admin/deliveries/assign")
+def assign_delivery(req: DeliveryRequest):
+    """Create a delivery. If driver_id/name is missing, it's an OPEN request (Pool)."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # Check if already assigned
+        existing = supabase.table('deliveries').select('id').eq('order_id', req.order_id).execute()
+        if existing.data:
+            return {"status": "exists", "delivery_id": existing.data[0]['id']}
+
+        # Create new delivery
+        status = "open" if not req.driver_name and not req.driver_id else "assigned"
+        
+        data = {
+            "order_id": req.order_id,
+            "driver_name": req.driver_name, # Can be null
+            "driver_id": req.driver_id,     # Can be null
+            "status": status,
+            # Start at shop location (mock Lisbon)
+            "current_lat": 38.7223,
+            "current_lng": -9.1393 
+        }
+        res = supabase.table('deliveries').insert(data).execute()
+        return {"status": "success", "delivery_id": res.data[0]['id']}
+    except Exception as e:
+        print(f"Error assigning delivery: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/driver/deliveries/{delivery_id}/accept")
+def accept_delivery(delivery_id: str, user = Depends(get_current_user)):
+    """Driver accepts an open delivery."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # UserResponse wrapper handling
+        driver_id = user.user.id if hasattr(user, 'user') else user.id
+        
+        # Get driver name from profile safely
+        driver_name = "Unknown Driver"
+        try:
+            profile = supabase.table('profiles').select('full_name').eq('id', driver_id).single().execute()
+            if profile.data:
+                driver_name = profile.data.get('full_name') or "Driver"
+        except Exception:
+             print("Profile not found for driver, using default.")
+             # Fallback if profile doesn't exist
+             pass
+
+        # 1. Check if available
+        existing = supabase.table('deliveries').select('driver_id, status').eq('id', delivery_id).single().execute()
+        if not existing.data:
+             raise HTTPException(status_code=404, detail="Delivery not found")
+        
+        if existing.data.get('driver_id') is not None:
+             raise HTTPException(status_code=400, detail="Delivery already taken")
+
+        # 2. Update
+        res = supabase.table('deliveries').update({
+            "driver_id": driver_id,
+            "driver_name": driver_name,
+            "status": "assigned"
+        }).eq('id', delivery_id).execute()
+        
+        return {"status": "success", "message": "Delivery accepted"}
+
+    except Exception as e:
+        print(f"Error accepting delivery: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/deliveries/simulate/{order_id}")
+async def simulate_delivery_endpoint(order_id: str):
+    """Trigger the background simulation script for a specific order."""
+    import subprocess
+    import sys
+    import os
+    
+    # We run the script as a separate process to not block the API
+    # This is a simple dev-mode way to do background tasks
+    try:
+        # Pass the ORDER_ID as an env var or argument to the script
+        # We need to modify the script to accept args or use this env idea
+        
+        # Actually simplest is just to run the script and let it use the arg
+        # But our script currently has a hardcoded placeholder.
+        # Let's update the script to read from sys.argv first? 
+        # Or better, we just spawn it with an env var.
+        
+        env = os.environ.copy()
+        env["SIMULATE_ORDER_ID"] = order_id
+        
+        # Assuming simulate_driver.py is in the same dir
+        script_path = "simulate_driver.py"
+        
+        subprocess.Popen([sys.executable, script_path], env=env, cwd=os.getcwd())
+        
+        return {"status": "started", "message": f"Simulation started for {order_id}"}
+    except Exception as e:
+        print(f"Error starting simulation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

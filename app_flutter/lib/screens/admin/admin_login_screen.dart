@@ -3,6 +3,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/app_translations.dart';
 import 'admin_dashboard_screen.dart';
+import '../../services/auth_service.dart';
+import '../auth/signup_screen.dart';
+import '../driver/driver_home_screen.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -25,11 +28,23 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         password: _passwordController.text.trim(),
       );
       if (mounted) {
-        // Navigate to Dashboard on success
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
-        );
+        final role = await AuthService().getUserRole();
+        if (mounted) {
+          if (role == 'driver') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DriverHomeScreen()),
+            );
+          } else if (role == 'client') {
+            Navigator.pop(context); // Go back to Menu
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const AdminDashboardScreen()),
+            );
+          }
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -55,11 +70,25 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     // Check if ALREADY logged in
     if (_supabase.auth.currentSession != null) {
       // Auto redirect if session exists
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
-        );
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final role = await AuthService().getUserRole();
+        if (context.mounted) {
+          if (role == 'driver') {
+            // TODO: Navigate to Driver Mode
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DriverHomeScreen()),
+            );
+          } else if (role == 'client') {
+            Navigator.pop(context); // Go back to Menu
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const AdminDashboardScreen()),
+            );
+          }
+        }
       });
     }
 
@@ -79,8 +108,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(LucideIcons.shieldAlert,
-                      size: 64, color: Colors.white),
+                  const Icon(LucideIcons.userCircle, // Changed from shieldAlert
+                      size: 64,
+                      color: Colors.white),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _emailController,
@@ -123,6 +153,20 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : Text(AppTranslations.of(context, 'loginToAdmin')),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SignUpScreen()),
+                      );
+                    },
+                    child: Text(
+                      AppTranslations.of(context, 'signUp'),
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ),
                 ],

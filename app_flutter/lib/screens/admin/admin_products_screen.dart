@@ -7,6 +7,7 @@ import '../../models/product.dart';
 import '../../services/app_translations.dart';
 import '../../utils/image_helper.dart';
 import 'product_editor_screen.dart';
+import '../../constants/api.dart';
 
 class AdminProductsScreen extends StatefulWidget {
   const AdminProductsScreen({super.key});
@@ -31,7 +32,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   Future<void> _deleteProduct(Product product) async {
     try {
       final url =
-          Uri.parse('http://localhost:8000/admin/products/${product.id}');
+          Uri.parse('${ApiConstants.baseUrl}/admin/products/${product.id}');
       final response = await http.delete(url);
 
       if (response.statusCode == 200 || response.statusCode == 204) {

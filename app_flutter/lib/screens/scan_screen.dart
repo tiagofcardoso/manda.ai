@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/table_service.dart';
 import 'main_screen.dart';
 import '../services/app_translations.dart';
+import '../services/cart_service.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -26,13 +26,40 @@ class _ScanScreenState extends State<ScanScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   Future<void> _processScan(String code) async {
-    // 1. Validate UUID format partially or try query
     try {
-      final response = await _supabase
-          .from('tables')
-          .select('table_number')
-          .eq('id', code)
-          .maybeSingle();
+      Map<String, dynamic>? response;
+
+      // Only try querying by ID if it looks like a UUID (32+ chars)
+      // "5" is definitely not a UUID, so this avoids the 22P02 Postgres error.
+      if (code.length >= 32) {
+        try {
+          response = await _supabase
+              .from('tables')
+              .select('table_number, id')
+              .eq('id', code)
+              .maybeSingle();
+        } catch (_) {
+          // If ID query fails (e.g. invalid format despite length), ignore and try table_number
+        }
+      }
+
+      // If uuid not found or skipped, try table_number
+      if (response == null) {
+        response = await _supabase
+            .from('tables')
+            .select('table_number, id')
+            .eq('table_number', code.padLeft(2, '0')) // Try "05"
+            .maybeSingle();
+
+        // Try exact match "5"
+        if (response == null) {
+          response = await _supabase
+              .from('tables')
+              .select('table_number, id')
+              .eq('table_number', code)
+              .maybeSingle();
+        }
+      }
 
       if (response == null) {
         if (mounted) {
@@ -49,7 +76,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
       final tableNumber = response!['table_number'];
 
-      TableService().setTable(code, tableNumber);
+      // Update global CartService so Checkout knows the table!
+      CartService().setTableId(tableNumber.toString());
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -81,8 +109,8 @@ class _ScanScreenState extends State<ScanScreen> {
     for (final barcode in barcodes) {
       if (barcode.rawValue != null) {
         final code = barcode.rawValue!;
-        if (code.length > 20) {
-          // Simple UUID length check
+        // Accept ANY code (UUID or "5")
+        if (code.isNotEmpty) {
           _isScanned = true;
           _processScan(code);
           break;

@@ -48,8 +48,8 @@ class AppTranslations {
       'cameraError': 'Camera Error',
       // Admin Keys
       'managerArea': 'Manager Area',
-      'adminLogin': 'Admin Login',
-      'loginToAdmin': 'LOGIN TO ADMIN',
+      'adminLogin': 'Login',
+      'loginToAdmin': 'LOGIN',
       'adminDashboard': 'Admin Dashboard',
       'products': 'Products',
       'sales': 'Sales',
@@ -83,6 +83,12 @@ class AppTranslations {
       'manageMenu': 'Manage Menu',
       'viewReport': 'View Report',
       'appSettings': 'App Settings',
+      'signUp': 'Sign Up',
+      'fullName': 'Full Name',
+      'iWantToDeliver': 'I want to deliver orders',
+      'alreadyHaveAccount': 'Already have an account? Login',
+      'signUpSuccess': 'Account created! Please login.',
+      'signUpError': 'Failed to create account',
     },
     'pt': {
       'appTitle': 'Manda.AI',
@@ -129,8 +135,8 @@ class AppTranslations {
       'cameraError': 'Erro na Câmera',
       // Admin Keys
       'managerArea': 'Área do Gerente',
-      'adminLogin': 'Login Admin',
-      'loginToAdmin': 'ENTRAR ADMIN',
+      'adminLogin': 'Entrar',
+      'loginToAdmin': 'ENTRAR',
       'adminDashboard': 'Painel Admin',
       'products': 'Produtos',
       'sales': 'Vendas',
@@ -164,6 +170,12 @@ class AppTranslations {
       'manageMenu': 'Gerenciar Cardápio',
       'viewReport': 'Ver Relatórios',
       'appSettings': 'Configurações do App',
+      'signUp': 'Criar Conta',
+      'fullName': 'Nome Completo',
+      'iWantToDeliver': 'Quero ser entregador',
+      'alreadyHaveAccount': 'Já tem conta? Entrar',
+      'signUpSuccess': 'Conta criada! Faça login.',
+      'signUpError': 'Erro ao criar conta',
     },
   };
 

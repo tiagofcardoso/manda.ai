@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 
 import '../services/order_service.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +26,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   RealtimeChannel? _subscription;
   final SupabaseClient _supabase = Supabase.instance.client;
   Stream<Map<String, dynamic>>? _orderStream;
+
+  // Map Variables
+  final MapController _mapController = MapController();
+  LatLng? _driverLocation;
+  LatLng?
+      _destinationLocation; // Mock for now, or fetch from order if address exists
+  // Mock Shop Location (e.g., Lisbon Center)
+  final LatLng _shopLocation = const LatLng(38.7223, -9.1393);
+  bool _isMapReady = false;
 
   @override
   void initState() {
@@ -82,11 +94,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     });
   }
 
-  // This method might become redundant if _orderStream handles real-time updates
+  // Subscribe to DELIVERY updates for this order
   void _subscribeToOrderUpdates() {
     if (_activeOrderId == null) return;
-    print('Tracking Order: $_activeOrderId');
-    _subscription = _supabase
+
+    // 1. Order Status Updates
+    _supabase
         .channel('public:orders:$_activeOrderId')
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
@@ -98,24 +111,53 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             value: _activeOrderId,
           ),
           callback: (payload) {
-            print('Order Update: ${payload.newRecord}');
             final newStatus = payload.newRecord['status'];
-            if (mounted) {
-              setState(() {
-                _currentStatus = newStatus;
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Order Update: It is now ${newStatus.toUpperCase()}!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
+            if (mounted) setState(() => _currentStatus = newStatus);
           },
         )
         .subscribe();
+
+    // 2. Delivery Location Updates (Realtime Broadcast)
+    // We listen to ANY delivery update linked to this order
+    _subscription = _supabase
+        .channel('tracking:$_activeOrderId')
+        .onBroadcast(
+            event: 'location_update',
+            callback: (payload) {
+              if (payload['lat'] != null && payload['lng'] != null) {
+                if (mounted) {
+                  setState(() {
+                    _driverLocation = LatLng(payload['lat'], payload['lng']);
+                  });
+                  // Optional: Auto-center map if needed
+                  // _mapController.move(_driverLocation!, 15);
+                }
+              }
+            })
+        .subscribe();
+
+    // Also fetch initial delivery location from DB if exists
+    _fetchInitialDeliveryLoc();
+  }
+
+  Future<void> _fetchInitialDeliveryLoc() async {
+    try {
+      final data = await _supabase
+          .from('deliveries')
+          .select()
+          .eq('order_id', _activeOrderId!)
+          .maybeSingle();
+
+      if (data != null && data['current_lat'] != null) {
+        if (mounted) {
+          setState(() {
+            _driverLocation = LatLng(data['current_lat'], data['current_lng']);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching delivery loc: $e');
+    }
   }
 
   @override
@@ -197,6 +239,117 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // === MAP SECTION (Only for Delivery) ===
+                      if (orderData['table_id'] == null)
+                        SizedBox(
+                          height: 250,
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                            child: Stack(
+                              children: [
+                                FlutterMap(
+                                  mapController: _mapController,
+                                  options: MapOptions(
+                                    initialCenter:
+                                        _shopLocation, // Start at shop
+                                    initialZoom: 14.5,
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                      userAgentPackageName: 'com.manda.client',
+                                      tileProvider:
+                                          CancellableNetworkTileProvider(),
+                                    ),
+                                    MarkerLayer(
+                                      markers: [
+                                        // Shop Marker
+                                        Marker(
+                                          point: _shopLocation,
+                                          width: 40,
+                                          height: 40,
+                                          child: const Icon(LucideIcons.store,
+                                              color: Colors.blue, size: 30),
+                                        ),
+                                        // Driver Marker (Dynamic)
+                                        if (_driverLocation != null)
+                                          Marker(
+                                            point: _driverLocation!,
+                                            width: 50,
+                                            height: 50,
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                        blurRadius: 5,
+                                                        color: Colors.black26)
+                                                  ]),
+                                              child: const Icon(
+                                                  LucideIcons.bike,
+                                                  color: Colors.red,
+                                                  size: 30),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                // Overlay Status
+                                Positioned(
+                                  bottom: 10,
+                                  left: 10,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        if (_driverLocation == null)
+                                          const Text('Waiting for driver...',
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12))
+                                        else
+                                          const Text('Driver on the way! 🛵',
+                                              style: TextStyle(
+                                                  color: Colors.greenAccent,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold))
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        // === TABLE HEADER (No Map) ===
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                              color: Colors.black26,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12))),
+                          child: Column(children: [
+                            const Icon(LucideIcons.armchair,
+                                size: 48, color: Colors.white54),
+                            const SizedBox(height: 8),
+                            Text('Dine-In • Table ${orderData['table_id']}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold))
+                          ]),
+                        ),
                       // Header
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -204,9 +357,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         decoration: BoxDecoration(
                           color: statusColor.withOpacity(0.2),
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(11),
-                            topRight: Radius.circular(11),
-                          ),
+                              // topLeft: Radius.circular(11), // Removed as map is top now
+                              // topRight: Radius.circular(11),
+                              ),
                           border: Border(
                               bottom: BorderSide(
                                   color: statusColor.withOpacity(0.5))),

@@ -8,9 +8,10 @@ import 'package:flutter/foundation.dart'; // Needed for kIsWeb
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
 import '../models/cart_item.dart';
-import '../services/table_service.dart';
 import 'order_tracking_screen.dart';
 import '../services/app_translations.dart';
+import '../services/auth_service.dart';
+import '../../constants/api.dart'; // Ensure API constants are used
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -170,13 +171,25 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
     setState(() => _isLoading = true);
 
     try {
-      final tableId = TableService().tableId ??
-          "00000000-0000-0000-0000-000000000000"; // Fallback
+      final tableId = widget.cartService.tableId;
 
-      // Prepare Payload
-      final orderData = {
-        "table_id": tableId,
+      // If no table, assume Delivery/Takeaway (Must be logged in or prompt address)
+      String? address;
+      if (tableId == null) {
+        // Simple prompt for now, or use saved address
+        final controller = TextEditingController();
+        // TODO: Improve this UX with a better address picker
+        // Ideally, show a dialog if address is not set
+        // For now, let's hardcode or ask user
+      }
+
+      final payload = {
+        "user_id": AuthService().currentUser?.id,
+        "table_id": tableId
+            ?.toString(), // Can be null for delivery, converted to String if present
         "total": widget.cartService.totalAmount,
+        "status": "pending",
+        "delivery_address": "Rua Exemplo 123", // Mock for now if delivery
         "items": widget.cartService.items
             .map((item) => {
                   "product_id": item.product.id,
@@ -188,17 +201,10 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
       };
 
       // Send to Backend
-      String baseUrl;
-      if (kIsWeb) {
-        baseUrl = 'http://127.0.0.1:8000'; // Web uses localhost
-      } else {
-        baseUrl = 'http://10.0.2.2:8000'; // Android Emulator alias
-      }
-
       final response = await http.post(
-        Uri.parse('$baseUrl/orders'),
+        Uri.parse('${ApiConstants.baseUrl}/orders'),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode(orderData),
+        body: jsonEncode(payload),
       );
 
       if (response.statusCode == 200) {
@@ -246,9 +252,11 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
         child: Column(
           children: [
             // Table Info (Centered Pill)
-            ValueListenableBuilder<String?>(
-              valueListenable: TableService().tableNumberNotifier,
-              builder: (context, tableNumber, _) {
+            ValueListenableBuilder<List<CartItem>>(
+              // Reusing the itemsNotifier for rebuild trigger, assuming simpler logic for now
+              valueListenable: widget.cartService.itemsNotifier,
+              builder: (context, _, __) {
+                final tableId = widget.cartService.tableId;
                 return Align(
                   alignment: Alignment.center,
                   child: Container(
@@ -262,13 +270,17 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(LucideIcons.utensilsCrossed,
-                            color: textColor?.withOpacity(0.7), size: 16),
+                        Icon(
+                            tableId != null
+                                ? LucideIcons.utensilsCrossed
+                                : LucideIcons.bike,
+                            color: textColor?.withOpacity(0.7),
+                            size: 16),
                         const SizedBox(width: 8),
                         Text(
-                          tableNumber != null
-                              ? '${AppTranslations.of(context, 'table')} $tableNumber'
-                              : AppTranslations.of(context, 'noTable'),
+                          tableId != null
+                              ? '${AppTranslations.of(context, 'table')} $tableId'
+                              : 'Delivery Mode',
                           style: TextStyle(
                               color: textColor, fontWeight: FontWeight.bold),
                         ),

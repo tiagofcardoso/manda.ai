@@ -12,7 +12,9 @@ import '../services/theme_service.dart';
 import '../services/app_translations.dart';
 import '../services/locale_service.dart';
 import 'admin/admin_login_screen.dart';
+import 'scan_screen.dart';
 import '../constants/categories.dart';
+import 'package:flutter/services.dart'; // For barcode scanner usually, but using mock for now or simple dialog logic
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -103,6 +105,22 @@ class _MenuScreenState extends State<MenuScreen> {
                       TextStyle(color: isDark ? Colors.white : Colors.black)),
               onTap: () => Navigator.pop(context),
             ),
+            ListTile(
+              leading: Icon(LucideIcons.qrCode,
+                  color: isDark ? Colors.white : Colors.black),
+              title: Text('Scan Table QR',
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black)),
+              onTap: () {
+                Navigator.pop(context);
+                // Navigate to REAL Scanner
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ScanScreen()));
+              },
+            ),
+
             const Divider(),
             ListTile(
               leading: Icon(LucideIcons.chefHat,
@@ -124,6 +142,21 @@ class _MenuScreenState extends State<MenuScreen> {
               leading: Icon(LucideIcons.shield,
                   color: isDark ? Colors.white : Colors.black),
               title: Text(AppTranslations.of(context, 'managerArea'),
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const AdminLoginScreen()));
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: Icon(LucideIcons.logIn,
+                  color: isDark ? Colors.white : Colors.black),
+              title: Text(AppTranslations.of(context, 'login'),
                   style:
                       TextStyle(color: isDark ? Colors.white : Colors.black)),
               onTap: () {
@@ -515,5 +548,43 @@ class _MenuScreenState extends State<MenuScreen> {
         ],
       ),
     );
+  }
+
+  // Temporary Mock Scanner until permission/camera logic is perfect
+  void _showScanDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Scan Table QR'),
+              content: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Enter Table ID (1-20)',
+                    hintText: 'e.g., 5',
+                    border: OutlineInputBorder()),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (controller.text.isNotEmpty) {
+                      CartService()
+                          .setTableId(controller.text); // Pass string directly
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              'Table ${controller.text} Set! Ordering for Dine-in.'),
+                          backgroundColor: Colors.green));
+                    }
+                  },
+                  child: const Text('Set Table'),
+                )
+              ],
+            ));
   }
 }

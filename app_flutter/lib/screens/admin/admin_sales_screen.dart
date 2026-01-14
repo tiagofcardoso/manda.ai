@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
+import '../../constants/api.dart';
 
 class AdminSalesScreen extends StatefulWidget {
   const AdminSalesScreen({super.key});
@@ -42,7 +43,7 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
   Future<void> _fetchChartData() async {
     try {
       final url = Uri.parse(
-          'http://localhost:8000/admin/stats/sales?period=$_selectedPeriod');
+          '${ApiConstants.baseUrl}/admin/stats/sales?period=$_selectedPeriod');
       final response = await http.get(url);
       if (response.statusCode == 200) {
         if (mounted) setState(() => _chartData = jsonDecode(response.body));
@@ -55,7 +56,7 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
   Future<void> _fetchTopProducts() async {
     try {
       final url =
-          Uri.parse('http://localhost:8000/admin/stats/top_products?limit=5');
+          Uri.parse('${ApiConstants.baseUrl}/admin/stats/top_products?limit=5');
       final response = await http.get(url);
       if (response.statusCode == 200) {
         if (mounted) setState(() => _topProducts = jsonDecode(response.body));
