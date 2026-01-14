@@ -12,6 +12,7 @@ import '../services/theme_service.dart';
 import '../services/app_translations.dart';
 import '../services/locale_service.dart';
 import 'admin/admin_login_screen.dart';
+import '../constants/categories.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -23,6 +24,7 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> {
   final _supabase = Supabase.instance.client;
   final _cartService = CartService();
+  String _selectedCategory = 'all';
 
   Future<List<Product>> _fetchProducts() async {
     final response = await _supabase
@@ -195,31 +197,142 @@ class _MenuScreenState extends State<MenuScreen> {
             );
           }
 
-          final products = snapshot.data!;
+          final allProducts = snapshot.data!;
 
-          // Responsive Grid
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final crossAxisCount = width > 600 ? 3 : (width > 400 ? 2 : 1);
-              // Decreased ratio = Taller cards. 0.75 -> 0.68 to fix overflow
-              final aspectRatio = width > 600 ? 0.68 : 0.65;
+          // Create lookup map: UUID -> CategoryData
+          final categoryIdsMap = {
+            'all': APP_CATEGORIES['all']!,
+            for (var entry in APP_CATEGORIES.values)
+              if (entry['id'] != 'all') entry['id'] as String: entry
+          };
 
-              return GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: aspectRatio,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+          // Get available categories from products
+          final availableCategoryIds = {
+            'all',
+            ...allProducts
+                .map((p) => p.categoryId)
+                .where((id) => id != null && categoryIdsMap.containsKey(id))
+                .cast<String>()
+          };
+
+          final filteredProducts = _selectedCategory == 'all'
+              ? allProducts
+              : allProducts
+                  .where((p) => p.categoryId == _selectedCategory)
+                  .toList();
+
+          return Column(
+            children: [
+              // Categories List
+              Container(
+                height: 100,
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: ListView.builder(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: availableCategoryIds.length,
+                  itemBuilder: (context, index) {
+                    final catId = availableCategoryIds.elementAt(index);
+                    final catData = categoryIdsMap[catId]!;
+                    final isSelected = _selectedCategory == catId;
+
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = catId),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFFE63946)
+                                    : (isDark
+                                        ? Colors.grey[800]
+                                        : Colors.white),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  if (!isDark)
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    )
+                                ],
+                              ),
+                              child: Icon(
+                                catData['icon'],
+                                size: 28,
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark
+                                        ? Colors.white70
+                                        : Colors.black87),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              catData['label'],
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isSelected
+                                    ? (isDark
+                                        ? Colors.white
+                                        : const Color(0xFFE63946))
+                                    : (isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey[800]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  final product = products[index];
-                  return _buildProductCard(context, product);
-                },
-              );
-            },
+              ),
+
+              // Products Grid
+              Expanded(
+                child: filteredProducts.isEmpty
+                    ? Center(
+                        child: Text(
+                          AppTranslations.of(context, 'noData'),
+                          style: TextStyle(
+                              color: isDark ? Colors.white54 : Colors.grey),
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final width = constraints.maxWidth;
+                          final crossAxisCount =
+                              width > 600 ? 3 : (width > 400 ? 2 : 1);
+                          final aspectRatio = width > 600 ? 0.68 : 0.65;
+
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              childAspectRatio: aspectRatio,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: filteredProducts.length,
+                            itemBuilder: (context, index) {
+                              final product = filteredProducts[index];
+                              return _buildProductCard(context, product);
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),

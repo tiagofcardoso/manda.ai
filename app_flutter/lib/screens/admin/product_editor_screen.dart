@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/product.dart';
 import '../../services/app_translations.dart';
+import '../../constants/categories.dart';
 
 class ProductEditorScreen extends StatefulWidget {
   final Product? product; // Null = Add, Not Null = Edit
@@ -20,6 +21,7 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
   final _imageController = TextEditingController();
+  String? _selectedCategory;
   bool _isLoading = false;
 
   @override
@@ -30,6 +32,7 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
       _descController.text = widget.product!.description ?? '';
       _priceController.text = widget.product!.price.toString();
       _imageController.text = widget.product!.imageUrl ?? '';
+      _selectedCategory = widget.product!.categoryId;
     }
   }
 
@@ -44,6 +47,7 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
         'description': _descController.text.trim(),
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
         'image_url': _imageController.text.trim(),
+        'category_id': _selectedCategory,
         'is_available': true,
       });
 
@@ -118,6 +122,8 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
               const SizedBox(height: 16),
               _buildTextField(
                   context, _imageController, 'productImage', Icons.image),
+              const SizedBox(height: 16),
+              _buildCategoryDropdown(context),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -167,6 +173,40 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
             borderSide: BorderSide(color: Colors.white)),
         contentPadding: const EdgeInsets.all(16),
       ),
+    );
+  }
+
+  Widget _buildCategoryDropdown(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      value: _selectedCategory,
+      dropdownColor: const Color(0xFF2d2d2d),
+      style: const TextStyle(color: Colors.white),
+      decoration: const InputDecoration(
+        labelText: 'Category',
+        labelStyle: TextStyle(color: Colors.white70),
+        prefixIcon: Icon(Icons.category, color: Colors.white54),
+        enabledBorder:
+            OutlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
+        focusedBorder:
+            OutlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+        contentPadding: EdgeInsets.all(16),
+      ),
+      items: APP_CATEGORIES.entries.where((e) => e.key != 'all').map((entry) {
+        final data = entry.value;
+        return DropdownMenuItem<String>(
+          value: data['id'] as String,
+          child: Row(
+            children: [
+              Icon(data['icon'],
+                  size: 16, color: data['color'] ?? Colors.white),
+              const SizedBox(width: 8),
+              Text(data['label']),
+            ],
+          ),
+        );
+      }).toList(),
+      onChanged: (value) => setState(() => _selectedCategory = value),
+      validator: (value) => value == null ? 'Required' : null,
     );
   }
 }

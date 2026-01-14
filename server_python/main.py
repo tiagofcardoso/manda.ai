@@ -131,7 +131,7 @@ class ProductRequest(BaseModel):
     description: str | None = None
     price: float
     image_url: str | None = None
-    category_id: int | None = None
+    category_id: str | None = None
     is_available: bool = True
 
 @app.post("/admin/products")
@@ -164,7 +164,10 @@ def update_product(product_id: str, product: ProductRequest): # Add Auth depende
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        response = supabase.table("products").update(product.dict(exclude_unset=True)).eq("id", product_id).execute()
+        print(f"DEBUG UPDATE: {product_id} with {product}")
+        payload = product.dict(exclude_unset=True)
+        print(f"DEBUG PAYLOAD: {payload}")
+        response = supabase.table("products").update(payload).eq("id", product_id).execute()
         return {"status": "success", "data": response.data}
     except Exception as e:
         print(f"Error updating product: {e}")
