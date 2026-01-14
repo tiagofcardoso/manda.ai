@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
 import '../models/cart_item.dart';
@@ -92,7 +93,7 @@ class _MenuScreenState extends State<MenuScreen> {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.restaurant_menu,
+              leading: Icon(LucideIcons.utensils,
                   color: isDark ? Colors.white : Colors.black),
               title: Text('Customer Menu',
                   style:
@@ -101,7 +102,7 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: Icon(Icons.soup_kitchen,
+              leading: Icon(LucideIcons.chefHat,
                   color: isDark ? Colors.white : Colors.black),
               title: Text('Kitchen Display (KDS)',
                   style:
@@ -148,58 +149,12 @@ class _MenuScreenState extends State<MenuScreen> {
           IconButton(
             icon: Icon(
               ThemeService().themeMode == ThemeMode.dark
-                  ? Icons.light_mode
-                  : Icons.dark_mode,
+                  ? LucideIcons.sun
+                  : LucideIcons.moon,
             ),
             onPressed: () {
               ThemeService().toggleTheme();
             },
-          ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CartScreen()),
-                  );
-                },
-              ),
-              ValueListenableBuilder<List<CartItem>>(
-                valueListenable: CartService().itemsNotifier,
-                builder: (context, items, _) {
-                  final count =
-                      items.fold(0, (sum, item) => sum + item.quantity);
-                  if (count == 0) return const SizedBox.shrink();
-
-                  return Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE63946),
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        '$count',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
           ),
         ],
       ),
@@ -215,7 +170,7 @@ class _MenuScreenState extends State<MenuScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.restaurant, size: 64, color: Colors.grey),
+                  Icon(LucideIcons.utensils, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
                   Text('Menu is loading...',
                       style: TextStyle(fontSize: 18, color: Colors.grey)),
@@ -252,6 +207,55 @@ class _MenuScreenState extends State<MenuScreen> {
           );
         },
       ),
+      floatingActionButton: ValueListenableBuilder<List<CartItem>>(
+        valueListenable: CartService().itemsNotifier,
+        builder: (context, items, _) {
+          final count = items.fold(0, (sum, item) => sum + item.quantity);
+          if (count == 0) return const SizedBox.shrink();
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              FloatingActionButton(
+                backgroundColor: const Color(0xFFE63946),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CartScreen()),
+                  );
+                },
+                child: const Icon(LucideIcons.shoppingBag, color: Colors.white),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: const Color(0xFFE63946), width: 2),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  child: Text(
+                    '$count',
+                    style: const TextStyle(
+                      color: Color(0xFFE63946),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -284,7 +288,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
                     color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    child: Icon(Icons.error,
+                    child: Icon(LucideIcons.alertCircle,
                         color: isDark ? Colors.white : Colors.black)),
               ),
             ),
@@ -345,7 +349,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             SnackBar(
                               content: Row(
                                 children: [
-                                  const Icon(Icons.check_circle,
+                                  const Icon(LucideIcons.checkCircle,
                                       color: Colors.green),
                                   const SizedBox(width: 8),
                                   // Text must be black on light yellow background
@@ -369,7 +373,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             color: Color(0xFFE63946),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.add,
+                          child: const Icon(LucideIcons.plus,
                               color: Colors.white, size: 20),
                         ),
                       ),

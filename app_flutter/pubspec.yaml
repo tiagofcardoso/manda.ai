@@ -42,6 +42,7 @@ dependencies:
   mobile_scanner: ^6.0.0
   flutter_localizations:
     sdk: flutter
+  lucide_icons: ^0.257.0
 
 
 # ...

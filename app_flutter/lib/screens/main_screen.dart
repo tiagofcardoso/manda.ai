@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'menu_screen.dart';
 import 'order_tracking_screen.dart';
 
@@ -38,11 +39,11 @@ class _MainScreenState extends State<MainScreen> {
         unselectedItemColor: Colors.grey,
         items: [
           BottomNavigationBarItem(
-            icon: const Icon(Icons.restaurant_menu),
+            icon: const Icon(LucideIcons.utensilsCrossed),
             label: AppTranslations.of(context, 'menu'),
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.receipt_long),
+            icon: const Icon(LucideIcons.receipt),
             label: AppTranslations.of(context, 'orders'),
           ),
         ],

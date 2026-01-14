@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'scan_screen.dart';
 import 'main_screen.dart';
 import '../services/table_service.dart';
@@ -29,8 +30,8 @@ class LandingScreen extends StatelessWidget {
                   color: Color(0xFFE63946),
                   shape: BoxShape.circle,
                 ),
-                child:
-                    const Icon(Icons.restaurant, size: 64, color: Colors.white),
+                child: const Icon(LucideIcons.utensils,
+                    size: 64, color: Colors.white),
               ),
               const SizedBox(height: 32),
               const SizedBox(height: 32),
@@ -57,7 +58,7 @@ class LandingScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (context) => const ScanScreen()),
                   );
                 },
-                icon: const Icon(Icons.qr_code_scanner),
+                icon: const Icon(LucideIcons.qrCode),
                 label: Text(AppTranslations.of(context, 'scanTable')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE63946),

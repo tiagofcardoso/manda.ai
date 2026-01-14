@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/table_service.dart';
@@ -102,7 +103,8 @@ class _ScanScreenState extends State<ScanScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error, color: Colors.red, size: 48),
+                const Icon(LucideIcons.alertTriangle,
+                    color: Colors.red, size: 48),
                 const SizedBox(height: 16),
                 const SizedBox(height: 16),
                 Text(

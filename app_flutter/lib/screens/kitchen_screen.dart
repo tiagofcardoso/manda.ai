@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/app_translations.dart';
+import '../utils/image_helper.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -204,8 +206,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.lock_outline,
-                        size: 64, color: Colors.white),
+                    const Icon(LucideIcons.lock, size: 64, color: Colors.white),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _emailController,
@@ -217,7 +218,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
                             borderSide: BorderSide(color: Colors.white30)),
                         focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(color: Colors.white)),
-                        prefixIcon: Icon(Icons.email, color: Colors.white54),
+                        prefixIcon:
+                            Icon(LucideIcons.mail, color: Colors.white54),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -232,7 +234,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
                             borderSide: BorderSide(color: Colors.white30)),
                         focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(color: Colors.white)),
-                        prefixIcon: Icon(Icons.lock, color: Colors.white54),
+                        prefixIcon:
+                            Icon(LucideIcons.lock, color: Colors.white54),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -267,11 +270,11 @@ class _KitchenScreenState extends State<KitchenScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(LucideIcons.refreshCw),
             onPressed: () => setState(() {}),
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(LucideIcons.logOut),
             onPressed: _signOut,
           )
         ],
@@ -297,7 +300,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.check_circle_outline,
+                  const Icon(LucideIcons.checkCircle,
                       size: 64, color: Colors.green),
                   const SizedBox(height: 16),
                   Text(AppTranslations.of(context, 'noOrdersKitchen'),
@@ -368,7 +371,7 @@ class _OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Order #${order['id'].toString().substring(0, 6)}',
+                  '${AppTranslations.of(context, 'orders')} #${order['id'].toString().substring(0, 6)}',
                   style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -385,7 +388,7 @@ class _OrderCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.table_restaurant,
+                      const Icon(LucideIcons.utensilsCrossed,
                           color: Colors.white, size: 14),
                       const SizedBox(width: 4),
                       Text(
@@ -421,19 +424,16 @@ class _OrderCard extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(4),
+                      // Product Image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: ImageHelper.buildProductImage(
+                          prodName,
+                          product != null ? product['image_url'] : null,
+                          width: 48,
+                          height: 48,
                         ),
-                        child: Text('${quantity}x',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -442,16 +442,29 @@ class _OrderCard extends StatelessWidget {
                           children: [
                             Text(prodName,
                                 style: const TextStyle(
-                                    color: Colors.white, fontSize: 16)),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
                             if (notes != null && notes.toString().isNotEmpty)
                               Text(
                                   '${AppTranslations.of(context, 'note')}: $notes',
                                   style: TextStyle(
                                       color: Colors.red[200],
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       fontStyle: FontStyle.italic)),
                           ],
                         ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('${quantity}x',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -470,7 +483,8 @@ class _OrderCard extends StatelessWidget {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                icon: Icon(isPending ? Icons.restaurant : Icons.check),
+                icon:
+                    Icon(isPending ? LucideIcons.utensils : LucideIcons.check),
                 label: Text(
                   isPending
                       ? AppTranslations.of(context, 'startPreparing')

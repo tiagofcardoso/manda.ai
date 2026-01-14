@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/order_service.dart';
+import 'package:intl/intl.dart';
+
 import '../services/app_translations.dart';
+import '../utils/image_helper.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String? orderId;
@@ -14,10 +18,11 @@ class OrderTrackingScreen extends StatefulWidget {
 }
 
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
-  final _supabase = Supabase.instance.client;
-  RealtimeChannel? _subscription;
-  String _currentStatus = 'pending';
   String? _activeOrderId;
+  String _currentStatus = 'pending'; // pending, prep, ready, completed
+  RealtimeChannel? _subscription;
+  final SupabaseClient _supabase = Supabase.instance.client;
+  Stream<Map<String, dynamic>>? _orderStream;
 
   @override
   void initState() {
@@ -51,29 +56,33 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       _subscription?.unsubscribe();
       if (newId != null) {
         _fetchInitialStatus();
-        _subscribeToOrderUpdates();
+        // _subscribeToOrderUpdates(); // This might be replaced by the stream
       }
     }
   }
 
   Future<void> _fetchInitialStatus() async {
     if (_activeOrderId == null) return;
-    try {
-      final data = await _supabase
-          .from('orders')
-          .select('status')
-          .eq('id', _activeOrderId!)
-          .single();
-      if (mounted) {
+    print('Tracking Order ID: ${_activeOrderId}');
+    _orderStream = _supabase
+        .from('orders')
+        .stream(primaryKey: ['id'])
+        .eq('id', _activeOrderId!)
+        .map((event) => event.isNotEmpty ? event.first : {});
+
+    // Listen to the stream to update _currentStatus
+    _orderStream?.listen((data) {
+      if (mounted && data.containsKey('status')) {
         setState(() {
           _currentStatus = data['status'];
         });
       }
-    } catch (e) {
-      debugPrint('Error fetching status: $e');
-    }
+    }).onError((error) {
+      debugPrint('Error listening to order stream: $error');
+    });
   }
 
+  // This method might become redundant if _orderStream handles real-time updates
   void _subscribeToOrderUpdates() {
     if (_activeOrderId == null) return;
     print('Tracking Order: $_activeOrderId');
@@ -118,8 +127,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-              const SizedBox(height: 16),
+              Icon(LucideIcons.receipt, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(AppTranslations.of(context, 'noActiveOrders'),
                   style: const TextStyle(fontSize: 18, color: Colors.grey)),
@@ -129,56 +137,213 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(AppTranslations.of(context, 'trackOrder')),
-        // No back button needed if in bottom nav, but optional close logic kept
-        automaticallyImplyLeading: false,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            Text('Order #${_activeOrderId!.substring(0, 8)}',
-                style: const TextStyle(fontSize: 16, color: Colors.grey)),
-            const SizedBox(height: 32),
-            _buildStatusStep(
-                'pending',
-                AppTranslations.of(context, 'statusPending'),
-                Icons.receipt_long),
-            _buildConnector('pending'),
-            _buildStatusStep('prep', AppTranslations.of(context, 'statusPrep'),
-                Icons.outdoor_grill),
-            _buildConnector('prep'),
-            _buildStatusStep(
-                'ready',
-                AppTranslations.of(context, 'statusReady'),
-                Icons.check_circle_outline),
-            const Spacer(),
-            if (_currentStatus == 'ready')
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green),
+    // Fetch full order details including items for the card
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: _orderStream,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Scaffold(
+            appBar:
+                AppBar(title: Text(AppTranslations.of(context, 'trackOrder'))),
+            body: const Center(
+                child: CircularProgressIndicator(color: Color(0xFFE63946))),
+          );
+        }
+
+        final orderData = snapshot.data!;
+        final items = orderData['items'] as List<dynamic>? ?? [];
+        final createdAt = DateTime.parse(orderData['created_at']).toLocal();
+        final timeString = DateFormat('HH:mm').format(createdAt);
+        final tableNumber = orderData['table_id'] != null
+            ? 'Table ${orderData['table_id'].toString().substring(0, 2)}' // Mock table logic if needed, or fetch table
+            : 'Takeaway';
+
+        // Determine Color based on status
+        Color statusColor = Colors.orange;
+        String statusText = AppTranslations.of(context, 'statusPrep');
+        if (_currentStatus == 'pending') {
+          statusColor = Colors.red;
+          statusText = AppTranslations.of(context, 'statusPending');
+        } else if (_currentStatus == 'ready') {
+          statusColor = Colors.green;
+          statusText = AppTranslations.of(context, 'statusReady');
+        } else if (_currentStatus == 'completed') {
+          statusColor = Colors.grey;
+          statusText = 'Completed';
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(AppTranslations.of(context, 'trackOrder')),
+            // No back button needed if in bottom nav, but optional close logic kept
+            automaticallyImplyLeading: false,
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Order #${_activeOrderId!.substring(0, 8)}',
+                    style: const TextStyle(color: Colors.white54)),
+                const SizedBox(height: 16),
+
+                // KDS Style Card
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1a1a1a),
+                    border: Border.all(color: Colors.white12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.2),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(11),
+                            topRight: Radius.circular(11),
+                          ),
+                          border: Border(
+                              bottom: BorderSide(
+                                  color: statusColor.withOpacity(0.5))),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                                '${AppTranslations.of(context, 'orders')} #${_activeOrderId!.substring(0, 5)}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(LucideIcons.utensilsCrossed,
+                                      size: 12, color: Colors.white70),
+                                  const SizedBox(width: 4),
+                                  Text(tableNumber,
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(timeString,
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+
+                      // Items List
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: items.length,
+                        padding: const EdgeInsets.all(12),
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          final product = item['product'];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: ImageHelper.buildProductImage(
+                                    product['name'],
+                                    product['image_url'],
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(product['name'],
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold)),
+                                      if (item['notes'] != null &&
+                                          item['notes'].toString().isNotEmpty)
+                                        Text(item['notes'],
+                                            style: TextStyle(
+                                                color: Colors.grey[400],
+                                                fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('${item['quantity']}x',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+
+                      // Status Footer using the "Button" look but static
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _currentStatus == 'ready'
+                                  ? LucideIcons.checkCircle
+                                  : _currentStatus == 'prep'
+                                      ? LucideIcons.chefHat
+                                      : LucideIcons.receipt,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              statusText.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.thumb_up, color: Colors.green),
-                    SizedBox(width: 12),
-                    Expanded(
-                        child: Text(
-                            AppTranslations.of(context, 'orderReadyMessage'),
-                            style: const TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold))),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

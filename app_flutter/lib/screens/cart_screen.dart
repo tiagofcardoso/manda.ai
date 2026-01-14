@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -15,12 +16,21 @@ class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
 
   @override
+  @override
   Widget build(BuildContext context) {
     final cartService = CartService();
-    // No explicit background/AppBar color -> Uses Theme
+    // Force dark background for this screen to match mockup
     return Scaffold(
+      backgroundColor: const Color(0xFF1a1a1a),
       appBar: AppBar(
-        title: Text(AppTranslations.of(context, 'cart')),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(AppTranslations.of(context, 'cart'),
+            style: const TextStyle(color: Colors.white)),
       ),
       body: ValueListenableBuilder<List<CartItem>>(
         valueListenable: cartService.itemsNotifier,
@@ -33,29 +43,87 @@ class CartScreen extends StatelessWidget {
           return Column(
             children: [
               Expanded(
-                child: ListView.separated(
-                  separatorBuilder: (context, index) => const Divider(),
+                child: ListView.builder(
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    return ListTile(
-                      leading: Text('${item.quantity}x',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
-                      title: Text(item.product.name),
-                      subtitle: Text(NumberFormat.currency(symbol: '€')
-                          .format(item.total)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    return Container(
+                      margin: const EdgeInsets.symmetric(
+                          vertical: 4, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2d2d2d),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
                         children: [
-                          IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () =>
-                                  cartService.updateQuantity(item, -1)),
-                          IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () =>
-                                  cartService.updateQuantity(item, 1)),
+                          // Product Image Thumbnail
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              color: Colors.grey[800],
+                              child: item.product.imageUrl != null &&
+                                      item.product.imageUrl!.isNotEmpty
+                                  ? Image.network(item.product.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                          LucideIcons.image,
+                                          color: Colors.white24))
+                                  : const Icon(LucideIcons.utensils,
+                                      color: Colors.white24),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          // Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.product.name,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  NumberFormat.currency(symbol: '€')
+                                      .format(item.total),
+                                  style: const TextStyle(
+                                      color: Color(0xFFE63946),
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Quantity Controls
+                          Container(
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                    icon: const Icon(LucideIcons.minus,
+                                        size: 16, color: Colors.white),
+                                    onPressed: () =>
+                                        cartService.updateQuantity(item, -1)),
+                                Text('${item.quantity}',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                IconButton(
+                                    icon: const Icon(LucideIcons.plus,
+                                        size: 16, color: Colors.white),
+                                    onPressed: () =>
+                                        cartService.updateQuantity(item, 1)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -152,44 +220,41 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(20),
-      color: isDark ? const Color(0xFF1E1E1E) : Colors.white, // Adaptation
+      color: const Color(0xFF1a1a1a),
       child: SafeArea(
         child: Column(
           children: [
-            // Table Info
+            // Table Info (Centered Pill)
             ValueListenableBuilder<String?>(
               valueListenable: TableService().tableNumberNotifier,
               builder: (context, tableNumber, _) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.1)
-                        : Colors.black.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.table_restaurant,
-                          color: isDark ? Colors.white70 : Colors.black54,
-                          size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        tableNumber != null
-                            ? '${AppTranslations.of(context, 'table')} $tableNumber'
-                            : AppTranslations.of(context, 'noTable'),
-                        style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                return Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(LucideIcons.utensilsCrossed,
+                            color: Colors.white70, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          tableNumber != null
+                              ? '${AppTranslations.of(context, 'table')} $tableNumber'
+                              : AppTranslations.of(context, 'noTable'),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -199,7 +264,9 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
               children: [
                 Text(AppTranslations.of(context, 'total'),
                     style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
                 Text(
                   NumberFormat.currency(symbol: '€')
                       .format(widget.cartService.totalAmount),
