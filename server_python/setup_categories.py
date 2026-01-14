@@ -9,7 +9,17 @@ REQUIRED_CATS = {
     'sandwiches': 'Sandwiches',
     'vegan': 'Vegan',
     'dessert': 'Desserts',
-    # 'drinks': 'Drinks', # Already exists
+    'drinks': 'Bebidas',
+    'italian': 'Italiana',
+    'japanese': 'Japonesa',
+    'chinese': 'Chinesa',
+    'brazilian': 'Brasileira',
+    'portuguese': 'Portuguesa',
+    'mexican': 'Mexicana',
+    'healthy': 'Saudável',
+    'pastry': 'Pastelaria',
+    'seafood': 'Peixes e Mariscos',
+    'vegetarian': 'Vegetariana',
 }
 
 def setup():
