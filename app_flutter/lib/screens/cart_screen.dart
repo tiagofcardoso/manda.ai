@@ -19,25 +19,28 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cartService = CartService();
-    // Force dark background for this screen to match mockup
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1a1a1a),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+          icon: Icon(LucideIcons.arrowLeft, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(AppTranslations.of(context, 'cart'),
-            style: const TextStyle(color: Colors.white)),
+            style: TextStyle(color: textColor)),
       ),
       body: ValueListenableBuilder<List<CartItem>>(
         valueListenable: cartService.itemsNotifier,
         builder: (context, items, _) {
           if (items.isEmpty) {
             return Center(
-                child: Text(AppTranslations.of(context, 'emptyCart')));
+                child: Text(AppTranslations.of(context, 'emptyCart'),
+                    style: TextStyle(color: textColor)));
           }
 
           return Column(
@@ -51,8 +54,16 @@ class CartScreen extends StatelessWidget {
                       margin: const EdgeInsets.symmetric(
                           vertical: 4, horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2d2d2d),
+                        color: Theme.of(context).cardTheme.color,
                         borderRadius: BorderRadius.circular(12),
+                        boxShadow: isDark
+                            ? []
+                            : [
+                                BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2))
+                              ],
                       ),
                       padding: const EdgeInsets.all(8.0),
                       child: Row(
@@ -63,16 +74,21 @@ class CartScreen extends StatelessWidget {
                             child: Container(
                               width: 60,
                               height: 60,
-                              color: Colors.grey[800],
+                              color:
+                                  isDark ? Colors.grey[800] : Colors.grey[200],
                               child: item.product.imageUrl != null &&
                                       item.product.imageUrl!.isNotEmpty
                                   ? Image.network(item.product.imageUrl!,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(
+                                      errorBuilder: (_, __, ___) => Icon(
                                           LucideIcons.image,
-                                          color: Colors.white24))
-                                  : const Icon(LucideIcons.utensils,
-                                      color: Colors.white24),
+                                          color: isDark
+                                              ? Colors.white24
+                                              : Colors.grey))
+                                  : Icon(LucideIcons.utensils,
+                                      color: isDark
+                                          ? Colors.white24
+                                          : Colors.grey),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -82,8 +98,8 @@ class CartScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(item.product.name,
-                                    style: const TextStyle(
-                                        color: Colors.white,
+                                    style: TextStyle(
+                                        color: textColor,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16)),
                                 const SizedBox(height: 4),
@@ -101,24 +117,24 @@ class CartScreen extends StatelessWidget {
                           Container(
                             height: 36,
                             decoration: BoxDecoration(
-                              color: Colors.white10,
+                              color: isDark ? Colors.white10 : Colors.grey[200],
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                    icon: const Icon(LucideIcons.minus,
-                                        size: 16, color: Colors.white),
+                                    icon: Icon(LucideIcons.minus,
+                                        size: 16, color: textColor),
                                     onPressed: () =>
                                         cartService.updateQuantity(item, -1)),
                                 Text('${item.quantity}',
-                                    style: const TextStyle(
-                                        color: Colors.white,
+                                    style: TextStyle(
+                                        color: textColor,
                                         fontWeight: FontWeight.bold)),
                                 IconButton(
-                                    icon: const Icon(LucideIcons.plus,
-                                        size: 16, color: Colors.white),
+                                    icon: Icon(LucideIcons.plus,
+                                        size: 16, color: textColor),
                                     onPressed: () =>
                                         cartService.updateQuantity(item, 1)),
                               ],
@@ -220,9 +236,12 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+
     return Container(
       padding: const EdgeInsets.all(20),
-      color: const Color(0xFF1a1a1a),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         child: Column(
           children: [
@@ -237,21 +256,21 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
                         const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: isDark ? Colors.white10 : Colors.grey[200],
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(LucideIcons.utensilsCrossed,
-                            color: Colors.white70, size: 16),
+                        Icon(LucideIcons.utensilsCrossed,
+                            color: textColor?.withOpacity(0.7), size: 16),
                         const SizedBox(width: 8),
                         Text(
                           tableNumber != null
                               ? '${AppTranslations.of(context, 'table')} $tableNumber'
                               : AppTranslations.of(context, 'noTable'),
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: textColor, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -263,8 +282,8 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(AppTranslations.of(context, 'total'),
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color: textColor,
                         fontSize: 20,
                         fontWeight: FontWeight.bold)),
                 Text(

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -121,4 +122,171 @@ def update_order_status(order_id: str, request: StatusUpdateRequests, user = Dep
         return {"status": "success", "data": response.data}
     except Exception as e:
         print(f"Error updating status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- ADMIN ENDPOINTS ---
+
+class ProductRequest(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    image_url: str | None = None
+    category_id: int | None = None
+    is_available: bool = True
+
+@app.post("/admin/products")
+def create_product(product: ProductRequest): # Add Auth dependency later
+    """Create a new product. Admin only."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # 1. Get Establishment (Mock for now, or use first one)
+        est_res = supabase.table("establishments").select("id").limit(1).execute()
+        est_id = est_res.data[0]['id'] if est_res.data else None
+        
+        if not est_id:
+             raise HTTPException(status_code=400, detail="No establishment found")
+
+        data = product.dict()
+        data['establishment_id'] = est_id
+        
+        response = supabase.table("products").insert(data).execute()
+        return {"status": "success", "data": response.data}
+    except Exception as e:
+        print(f"Error creating product: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/admin/products/{product_id}")
+def update_product(product_id: str, product: ProductRequest): # Add Auth dependency later
+    """Update an existing product. Admin only."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        response = supabase.table("products").update(product.dict(exclude_unset=True)).eq("id", product_id).execute()
+        return {"status": "success", "data": response.data}
+    except Exception as e:
+        print(f"Error updating product: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/products/{product_id}")
+def delete_product(product_id: str): # Add Auth dependency later
+    """Delete a product. Admin only."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # Soft delete is better, but user asked for delete. Using hard delete for now.
+        response = supabase.table("products").delete().eq("id", product_id).execute()
+        return {"status": "success", "data": response.data}
+    except Exception as e:
+        print(f"Error deleting product: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/stats/sales")
+def get_sales_stats(period: str = 'daily'):
+    """Fetch sales stats aggregated by period (daily, weekly, monthly)."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        now = datetime.now()
+        data_points = []
+        
+        if period == 'daily':
+            # Last 24 hours or "Today"
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            response = supabase.table('orders').select('created_at, total_amount').gte('created_at', start_date.isoformat()).execute()
+            
+            # Aggregate by hour
+            hourly_data = {i: 0.0 for i in range(24)}
+            for order in response.data:
+                # Handle Z timezone or offset if present
+                ts = order['created_at'].replace('Z', '+00:00')
+                dt = datetime.fromisoformat(ts)
+                hourly_data[dt.hour] += order['total_amount']
+            
+            data_points = [{"label": f"{h}h", "value": hourly_data[h]} for h in range(24)]
+
+        elif period == 'weekly':
+            # Last 7 days
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=6)
+            response = supabase.table('orders').select('created_at, total_amount').gte('created_at', start_date.isoformat()).execute()
+            
+            daily_data = {} 
+            for i in range(7):
+                 d = start_date + timedelta(days=i)
+                 daily_data[d.strftime('%Y-%m-%d')] = 0.0
+
+            for order in response.data:
+                ts = order['created_at'].replace('Z', '+00:00')
+                dt = datetime.fromisoformat(ts)
+                key = dt.strftime('%Y-%m-%d')
+                if key in daily_data:
+                    daily_data[key] += order['total_amount']
+            
+            data_points = []
+            for date_str, total in daily_data.items():
+                dt = datetime.strptime(date_str, '%Y-%m-%d')
+                data_points.append({"label": dt.strftime('%a'), "value": total})
+
+        elif period == 'monthly':
+             # Last 30 days
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=29)
+            response = supabase.table('orders').select('created_at, total_amount').gte('created_at', start_date.isoformat()).execute()
+            
+            daily_data = {}
+            for i in range(30):
+                 d = start_date + timedelta(days=i)
+                 daily_data[d.strftime('%Y-%m-%d')] = 0.0
+
+            for order in response.data:
+                 ts = order['created_at'].replace('Z', '+00:00')
+                 dt = datetime.fromisoformat(ts)
+                 key = dt.strftime('%Y-%m-%d')
+                 if key in daily_data:
+                     daily_data[key] += order['total_amount']
+            
+            data_points = [{"label": date_str[8:], "value": total} for date_str, total in daily_data.items()] # label = day part only
+
+        return data_points
+
+    except Exception as e:
+        print(f"Error fetching stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/stats/top_products")
+def get_top_products(limit: int = 5):
+    """Fetch top selling products based on order_items."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        # Fetch all order items and their related product names
+        # Note: In a real production DB, this should be a SQL view or RPC for performance.
+        # For now, we fetch and aggregate in Python.
+        response = supabase.table('order_items').select('product_id, quantity, products(name, price)').execute()
+        
+        product_sales = {}
+        
+        for item in response.data:
+            pid = item['product_id']
+            qty = item['quantity']
+            product_name = item['products']['name'] if item.get('products') else 'Unknown'
+            # price = item['products']['price'] # Not strictly needed if we sort by qty
+            
+            if pid not in product_sales:
+                product_sales[pid] = {'name': product_name, 'quantity': 0, 'revenue': 0.0}
+            
+            product_sales[pid]['quantity'] += qty
+            # We could add revenue here if we had unit_price history or average
+        
+        # Sort by quantity desc
+        sorted_products = sorted(product_sales.values(), key=lambda x: x['quantity'], reverse=True)
+        
+        return sorted_products[:limit]
+
+    except Exception as e:
+        print(f"Error fetching top products: {e}")
         raise HTTPException(status_code=500, detail=str(e))

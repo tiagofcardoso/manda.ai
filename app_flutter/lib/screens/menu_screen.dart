@@ -11,6 +11,7 @@ import 'kitchen_screen.dart';
 import '../services/theme_service.dart';
 import '../services/app_translations.dart';
 import '../services/locale_service.dart';
+import 'admin/admin_login_screen.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -114,6 +115,21 @@ class _MenuScreenState extends State<MenuScreen> {
                     context,
                     MaterialPageRoute(
                         builder: (context) => const KitchenScreen()));
+              },
+            ),
+            const Divider(), // Another divider for separation
+            ListTile(
+              leading: Icon(LucideIcons.shield,
+                  color: isDark ? Colors.white : Colors.black),
+              title: Text(AppTranslations.of(context, 'managerArea'),
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const AdminLoginScreen()));
               },
             ),
           ],

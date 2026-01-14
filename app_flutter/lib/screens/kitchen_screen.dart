@@ -187,55 +187,62 @@ class _KitchenScreenState extends State<KitchenScreen> {
   @override
   Widget build(BuildContext context) {
     final session = _supabase.auth.currentSession;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     // Show Login Screen if no session
     if (session == null) {
       return Scaffold(
         appBar: AppBar(
-            title: Text(AppTranslations.of(context, 'kitchenLogin')),
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white),
-        backgroundColor: const Color(0xFF1a1a1a),
+            title: Text(AppTranslations.of(context, 'kitchenLogin'),
+                style: TextStyle(color: textColor)),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            foregroundColor: textColor),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Card(
-              color: Colors.grey[900],
+              color: Theme.of(context).cardTheme.color,
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(LucideIcons.lock, size: 64, color: Colors.white),
+                    Icon(LucideIcons.lock, size: 64, color: textColor),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _emailController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: textColor),
+                      decoration: InputDecoration(
                         labelText: 'Email',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle:
+                            TextStyle(color: textColor?.withOpacity(0.7)),
                         enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white30)),
+                            borderSide:
+                                BorderSide(color: textColor!.withOpacity(0.3))),
                         focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white)),
-                        prefixIcon:
-                            Icon(LucideIcons.mail, color: Colors.white54),
+                            borderSide: BorderSide(color: textColor!)),
+                        prefixIcon: Icon(LucideIcons.mail,
+                            color: textColor?.withOpacity(0.5)),
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: textColor),
+                      decoration: InputDecoration(
                         labelText: 'Password',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle:
+                            TextStyle(color: textColor?.withOpacity(0.7)),
                         enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white30)),
+                            borderSide:
+                                BorderSide(color: textColor!.withOpacity(0.3))),
                         focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white)),
-                        prefixIcon:
-                            Icon(LucideIcons.lock, color: Colors.white54),
+                            borderSide: BorderSide(color: textColor!)),
+                        prefixIcon: Icon(LucideIcons.lock,
+                            color: textColor?.withOpacity(0.5)),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -265,9 +272,10 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppTranslations.of(context, 'kitchenDisplayTitle')),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        title: Text(AppTranslations.of(context, 'kitchenDisplayTitle'),
+            style: TextStyle(color: textColor)),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: textColor,
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.refreshCw),
@@ -279,7 +287,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
           )
         ],
       ),
-      backgroundColor: const Color(0xFF1a1a1a),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _fetchActiveOrders(),
         builder: (context, snapshot) {
@@ -290,7 +298,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
           if (snapshot.hasError) {
             return Center(
                 child: Text('Error: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.white)));
+                    style: TextStyle(color: textColor)));
           }
 
           final orders = snapshot.data ?? [];
@@ -300,12 +308,13 @@ class _KitchenScreenState extends State<KitchenScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(LucideIcons.checkCircle,
-                      size: 64, color: Colors.green),
+                  Icon(LucideIcons.checkCircle,
+                      size: 64,
+                      color: isDark ? Colors.greenAccent : Colors.green),
                   const SizedBox(height: 16),
                   Text(AppTranslations.of(context, 'noOrdersKitchen'),
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 18)),
+                      style: TextStyle(
+                          color: textColor?.withOpacity(0.7), fontSize: 18)),
                 ],
               ),
             );
@@ -341,6 +350,9 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+
     final DateTime createdAt = DateTime.parse(order['created_at']).toLocal();
     final timeStr = DateFormat('HH:mm').format(createdAt);
 
@@ -348,22 +360,27 @@ class _OrderCard extends StatelessWidget {
     final isPending = status == 'PENDING';
     final cardColor = isPending ? Colors.orange.shade900 : Colors.blue.shade900;
 
+    // Softer background for Light Mode, Deep dark for Dark Mode
+    final bgColor = isDark ? Colors.grey[900] : Colors.white;
+    final borderColor = isDark ? cardColor : cardColor.withOpacity(0.6);
+
     final items = List<Map<String, dynamic>>.from(order['order_items'] ?? []);
 
     return Card(
-      color: Colors.grey[900],
+      color: bgColor,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: cardColor, width: 2),
+        side: BorderSide(color: borderColor, width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
+      elevation: isDark ? 0 : 4,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: cardColor.withOpacity(0.3),
+              color: cardColor.withOpacity(isDark ? 0.3 : 0.1),
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(12)),
             ),
@@ -372,8 +389,8 @@ class _OrderCard extends StatelessWidget {
               children: [
                 Text(
                   '${AppTranslations.of(context, 'orders')} #${order['id'].toString().substring(0, 6)}',
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: textColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 16),
                 ),
@@ -382,21 +399,23 @@ class _OrderCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.black38,
+                    color: isDark ? Colors.black38 : Colors.grey[200],
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.white24, width: 1),
+                    border: Border.all(
+                        color: isDark ? Colors.white24 : Colors.grey[400]!,
+                        width: 1),
                   ),
                   child: Row(
                     children: [
-                      const Icon(LucideIcons.utensilsCrossed,
-                          color: Colors.white, size: 14),
+                      Icon(LucideIcons.utensilsCrossed,
+                          color: textColor, size: 14),
                       const SizedBox(width: 4),
                       Text(
                         order['tables'] != null
                             ? '${AppTranslations.of(context, 'table')} ${order['tables']['table_number']}'
                             : AppTranslations.of(context, 'takeaway'),
-                        style: const TextStyle(
-                            color: Colors.white,
+                        style: TextStyle(
+                            color: textColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 13),
                       ),
@@ -405,8 +424,9 @@ class _OrderCard extends StatelessWidget {
                 ),
                 Text(
                   timeStr,
-                  style: const TextStyle(
-                      color: Colors.white70, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: textColor?.withOpacity(0.7),
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -441,14 +461,14 @@ class _OrderCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(prodName,
-                                style: const TextStyle(
-                                    color: Colors.white,
+                                style: TextStyle(
+                                    color: textColor,
                                     fontWeight: FontWeight.bold)),
                             if (notes != null && notes.toString().isNotEmpty)
                               Text(
                                   '${AppTranslations.of(context, 'note')}: $notes',
                                   style: TextStyle(
-                                      color: Colors.red[200],
+                                      color: Colors.red[300],
                                       fontSize: 12,
                                       fontStyle: FontStyle.italic)),
                           ],
@@ -458,13 +478,12 @@ class _OrderCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white10,
+                          color: isDark ? Colors.white10 : Colors.grey[200],
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text('${quantity}x',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                color: textColor, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),

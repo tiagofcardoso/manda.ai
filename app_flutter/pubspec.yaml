@@ -43,6 +43,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   lucide_icons: ^0.257.0
+  fl_chart: ^0.69.0
 
 
 # ...
