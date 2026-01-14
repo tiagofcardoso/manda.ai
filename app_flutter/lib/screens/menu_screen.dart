@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import '../models/cart_item.dart';
 import 'package:intl/intl.dart';
 import '../services/cart_service.dart';
 import 'cart_screen.dart';
 import 'kitchen_screen.dart';
+
+import '../services/theme_service.dart';
+import '../services/app_translations.dart';
+import '../services/locale_service.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -56,21 +61,24 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Light grey background
+      // No explicit background color, uses Theme.scaffoldBackgroundColor
       drawer: Drawer(
+        // Drawer color uses Theme default or override if needed
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
+            DrawerHeader(
+              decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                      colors: [Color(0xFFE63946), Color(0xFFD62828)])),
+                      colors: [Color(0xFFB71C1C), Color(0xFFE63946)])),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Manda.AI',
                     style: TextStyle(
                         color: Colors.white,
@@ -78,19 +86,26 @@ class _MenuScreenState extends State<MenuScreen> {
                         fontWeight: FontWeight.bold),
                   ),
                   Text('Restaurant OS',
-                      style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 14)),
                 ],
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.restaurant_menu),
-              title: const Text('Customer Menu'),
+              leading: Icon(Icons.restaurant_menu,
+                  color: isDark ? Colors.white : Colors.black),
+              title: Text('Customer Menu',
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black)),
               onTap: () => Navigator.pop(context),
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.soup_kitchen),
-              title: const Text('Kitchen Display (KDS)'),
+              leading: Icon(Icons.soup_kitchen,
+                  color: isDark ? Colors.white : Colors.black),
+              title: Text('Kitchen Display (KDS)',
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black)),
               subtitle: const Text('Realtime Orders'),
               onTap: () {
                 Navigator.pop(context);
@@ -104,19 +119,87 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
       appBar: AppBar(
-        title: const Text('Manda.AI Menu',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(AppTranslations.of(context, 'menu'),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              "Manda Burger Pub",
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          ],
+        ),
+        // AppBar colors handled by Theme
         actions: [
+          // Language Toggle
           IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
+            icon: Text(
+              Localizations.localeOf(context).languageCode == 'en'
+                  ? '🇺🇸'
+                  : '🇧🇷',
+              style: const TextStyle(fontSize: 24),
+            ),
             onPressed: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => const CartScreen()));
+              LocaleService().toggleLocale();
             },
+          ),
+          // Theme Toggle
+          IconButton(
+            icon: Icon(
+              ThemeService().themeMode == ThemeMode.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            onPressed: () {
+              ThemeService().toggleTheme();
+            },
+          ),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CartScreen()),
+                  );
+                },
+              ),
+              ValueListenableBuilder<List<CartItem>>(
+                valueListenable: CartService().itemsNotifier,
+                builder: (context, items, _) {
+                  final count =
+                      items.fold(0, (sum, item) => sum + item.quantity);
+                  if (count == 0) return const SizedBox.shrink();
+
+                  return Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE63946),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -124,7 +207,8 @@ class _MenuScreenState extends State<MenuScreen> {
         future: _fetchProducts(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+                child: CircularProgressIndicator(color: Colors.white));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(
@@ -172,13 +256,15 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildProductCard(BuildContext context, Product product) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color, // Use Theme Card Color
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -197,7 +283,9 @@ class _MenuScreenState extends State<MenuScreen> {
                 image: _getImageForProduct(product),
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey[200], child: const Icon(Icons.error)),
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    child: Icon(Icons.error,
+                        color: isDark ? Colors.white : Colors.black)),
               ),
             ),
           ),
@@ -218,10 +306,10 @@ class _MenuScreenState extends State<MenuScreen> {
                         product.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1D3557),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -231,7 +319,7 @@ class _MenuScreenState extends State<MenuScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                           height: 1.2,
                         ),
                       ),
@@ -255,12 +343,23 @@ class _MenuScreenState extends State<MenuScreen> {
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Added ${product.name} to cart'),
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.check_circle,
+                                      color: Colors.green),
+                                  const SizedBox(width: 8),
+                                  // Text must be black on light yellow background
+                                  Text('${product.name} added to cart!',
+                                      style: const TextStyle(
+                                          color: Colors.black87)),
+                                ],
+                              ),
                               behavior: SnackBarBehavior.floating,
-                              backgroundColor: const Color(0xFF1D3557),
+                              backgroundColor:
+                                  Colors.yellow[100], // Amarelo Fraquinho
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10)),
-                              duration: const Duration(seconds: 1),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'screens/menu_screen.dart';
+
+import 'screens/landing_screen.dart';
+import 'services/theme_service.dart';
+import 'services/locale_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,22 +41,71 @@ class MandaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Manda.AI',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE63946), // A vibrant red
-          brightness: Brightness.dark, // Dark mode for bars/pubs
-        ),
-        textTheme: GoogleFonts.interTextTheme(
-          Theme.of(context)
-              .textTheme
-              .apply(bodyColor: Colors.white, displayColor: Colors.white),
-        ),
-        useMaterial3: true,
-      ),
-      home: const MenuScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService().themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return ValueListenableBuilder<Locale>(
+            valueListenable: LocaleService().localeNotifier,
+            builder: (context, locale, _) {
+              return MaterialApp(
+                title: 'Manda.AI Client',
+                debugShowCheckedModeBanner: false,
+                themeMode: themeMode,
+                // Localizations
+                locale: locale,
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: const [
+                  Locale('en'), // English
+                  Locale('pt'), // Portuguese
+                ],
+                // Themes
+                theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                      seedColor: const Color(0xFFE63946),
+                      brightness: Brightness.light),
+                  useMaterial3: true,
+                  scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+                  textTheme: GoogleFonts.interTextTheme(),
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                  ),
+                  cardTheme: CardTheme(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    color: Colors.white,
+                  ),
+                ),
+                darkTheme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                      seedColor: const Color(0xFFE63946),
+                      brightness: Brightness.dark),
+                  useMaterial3: true,
+                  scaffoldBackgroundColor: const Color(0xFF121212),
+                  textTheme: GoogleFonts.interTextTheme().apply(
+                      bodyColor: Colors.white, displayColor: Colors.white),
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Color(0xFF1E1E1E),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  cardTheme: CardTheme(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    color: const Color(0xFF1E1E1E),
+                  ),
+                ),
+                home: const LandingScreen(),
+              );
+            });
+      },
     );
   }
 }

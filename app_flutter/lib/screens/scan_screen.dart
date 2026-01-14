@@ -1,0 +1,112 @@
+import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/table_service.dart';
+import 'main_screen.dart';
+
+class ScanScreen extends StatefulWidget {
+  const ScanScreen({super.key});
+
+  @override
+  State<ScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends State<ScanScreen> {
+  final MobileScannerController _controller = MobileScannerController();
+  bool _isScanned = false; // Prevent multiple scans
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  Future<void> _processScan(String code) async {
+    // 1. Validate UUID format partially or try query
+    try {
+      final response = await _supabase
+          .from('tables')
+          .select('table_number')
+          .eq('id', code)
+          .maybeSingle();
+
+      if (response == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Invalid Table QR Code: $code'),
+                backgroundColor: Colors.red),
+          );
+          _isScanned = false; // Allow retry
+          return;
+        }
+      }
+
+      final tableNumber = response!['table_number'];
+
+      TableService().setTable(code, tableNumber);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Mesa $tableNumber confirmada!'),
+              backgroundColor: Colors.green),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        _isScanned = false;
+      }
+    }
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_isScanned) return;
+    final List<Barcode> barcodes = capture.barcodes;
+
+    for (final barcode in barcodes) {
+      if (barcode.rawValue != null) {
+        final code = barcode.rawValue!;
+        if (code.length > 20) {
+          // Simple UUID length check
+          _isScanned = true;
+          _processScan(code);
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Scan Table QR Code')),
+      body: MobileScanner(
+        controller: _controller,
+        onDetect: _onDetect,
+        errorBuilder: (context, error, child) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text('Camera Error: ${error.errorCode}'),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

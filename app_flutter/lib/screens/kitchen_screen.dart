@@ -369,6 +369,32 @@ class _OrderCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       fontSize: 16),
                 ),
+                // Display Table Number or Takeaway
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black38,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.white24, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.table_restaurant,
+                          color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        order['tables'] != null
+                            ? 'Mesa ${order['tables']['table_number']}'
+                            : 'Viagem',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
                 Text(
                   timeStr,
                   style: const TextStyle(

@@ -5,7 +5,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart'; // Needed for kIsWeb
 
 import '../services/cart_service.dart';
+import '../services/order_service.dart';
 import '../models/cart_item.dart';
+import '../services/table_service.dart';
+import 'order_tracking_screen.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -13,7 +16,7 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cartService = CartService();
-
+    // No explicit background/AppBar color -> Uses Theme
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your Order'),
@@ -28,7 +31,8 @@ class CartScreen extends StatelessWidget {
           return Column(
             children: [
               Expanded(
-                child: ListView.builder(
+                child: ListView.separated(
+                  separatorBuilder: (context, index) => const Divider(),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
@@ -80,10 +84,12 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
     setState(() => _isLoading = true);
 
     try {
+      final tableId = TableService().tableId ??
+          "00000000-0000-0000-0000-000000000000"; // Fallback
+
       // Prepare Payload
       final orderData = {
-        "table_id":
-            "00000000-0000-0000-0000-000000000000", // TODO: Get REAL Table ID from QR Scan
+        "table_id": tableId,
         "total": widget.cartService.totalAmount,
         "items": widget.cartService.items
             .map((item) => {
@@ -110,11 +116,23 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
       );
 
       if (response.statusCode == 200) {
+        final respJson = jsonDecode(response.body);
+        final orderId = respJson['order_id'];
+
+        // Save globally
+        OrderService().setOrderId(orderId);
         widget.cartService.clear();
+
         if (mounted) {
+          Navigator.pop(context); // Close Cart
+
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Order sent to kitchen! 👨‍🍳')));
-          Navigator.pop(context);
+            const SnackBar(
+              content: Text('Order placed! Go to "Orders" tab to track it.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
         }
       } else {
         throw Exception('Failed to place order: ${response.body}');
@@ -131,18 +149,54 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(20),
-      color: Colors.grey.shade900,
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white, // Adaptation
       child: SafeArea(
         child: Column(
           children: [
+            // Table Info
+            ValueListenableBuilder<String?>(
+              valueListenable: TableService().tableNumberNotifier,
+              builder: (context, tableNumber, _) {
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.1)
+                        : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.table_restaurant,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                          size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        tableNumber != null
+                            ? 'Mesa $tableNumber'
+                            : 'No Table (Takeaway)',
+                        style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total:',
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text('Total:',
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold)),
                 Text(
                   NumberFormat.currency(symbol: '€')
                       .format(widget.cartService.totalAmount),

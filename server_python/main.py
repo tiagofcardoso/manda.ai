@@ -93,7 +93,7 @@ def get_kds_orders(user = Depends(get_current_user)):
         # Fetch orders with status 'pending' or 'prep'
         # We fetch related items and products for display
         response = supabase.table('orders') \
-            .select('*, order_items(*, products(name))') \
+            .select('*, tables(table_number), order_items(*, products(name))') \
             .or_('status.eq.pending,status.eq.prep') \
             .order('created_at', desc=False) \
             .execute()
