@@ -4,6 +4,8 @@ from database import supabase
 REQUIRED_CATS = {
     'fast_food': 'Fast Food',
     'pizza': 'Pizzas',
+    'sweet pizza': 'Pizzas doces',
+    'soft drinks': 'Refrigerantes',
     'sushi': 'Sushi',
     'bbq': 'Churrasco',
     'sandwiches': 'Sandwiches',

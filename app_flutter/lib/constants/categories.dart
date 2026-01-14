@@ -68,6 +68,13 @@ final Map<String, Map<String, dynamic>> APP_CATEGORIES = {
     'icon': LucideIcons.beer,
     'color': Colors.blue,
   },
+  'soft drinks': {
+    'id': '0fa83a66-5b37-4d62-9426-a9c1d40ee859',
+    'label': 'Refrigerantes',
+    'en_label': 'Soft Drinks',
+    'icon': LucideIcons.beer,
+    'color': Colors.blue,
+  },
   'dessert': {
     'id': '1113c888-9859-4291-ba6e-359319a7cfa2',
     'label': 'Sobremesas',
