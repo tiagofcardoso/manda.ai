@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/order_service.dart';
+import '../services/app_translations.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String? orderId;
@@ -112,15 +113,16 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   Widget build(BuildContext context) {
     if (_activeOrderId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Track Order')),
+        appBar: AppBar(title: Text(AppTranslations.of(context, 'trackOrder'))),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
-              const Text('No active orders',
-                  style: TextStyle(fontSize: 18, color: Colors.grey)),
+              const SizedBox(height: 16),
+              Text(AppTranslations.of(context, 'noActiveOrders'),
+                  style: const TextStyle(fontSize: 18, color: Colors.grey)),
             ],
           ),
         ),
@@ -129,7 +131,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Track Order'),
+        title: Text(AppTranslations.of(context, 'trackOrder')),
         // No back button needed if in bottom nav, but optional close logic kept
         automaticallyImplyLeading: false,
       ),
@@ -140,12 +142,18 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             Text('Order #${_activeOrderId!.substring(0, 8)}',
                 style: const TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 32),
-            _buildStatusStep('pending', 'Order Received', Icons.receipt_long),
+            _buildStatusStep(
+                'pending',
+                AppTranslations.of(context, 'statusPending'),
+                Icons.receipt_long),
             _buildConnector('pending'),
-            _buildStatusStep('prep', 'Preparing', Icons.outdoor_grill),
+            _buildStatusStep('prep', AppTranslations.of(context, 'statusPrep'),
+                Icons.outdoor_grill),
             _buildConnector('prep'),
             _buildStatusStep(
-                'ready', 'Ready to Pickup', Icons.check_circle_outline),
+                'ready',
+                AppTranslations.of(context, 'statusReady'),
+                Icons.check_circle_outline),
             const Spacer(),
             if (_currentStatus == 'ready')
               Container(
@@ -155,14 +163,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.green),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.thumb_up, color: Colors.green),
                     SizedBox(width: 12),
                     Expanded(
                         child: Text(
-                            'Your food is ready! Please collect it at the counter.',
-                            style: TextStyle(
+                            AppTranslations.of(context, 'orderReadyMessage'),
+                            style: const TextStyle(
                                 color: Colors.green,
                                 fontWeight: FontWeight.bold))),
                   ],

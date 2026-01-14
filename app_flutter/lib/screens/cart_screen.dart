@@ -9,6 +9,7 @@ import '../services/order_service.dart';
 import '../models/cart_item.dart';
 import '../services/table_service.dart';
 import 'order_tracking_screen.dart';
+import '../services/app_translations.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -19,13 +20,14 @@ class CartScreen extends StatelessWidget {
     // No explicit background/AppBar color -> Uses Theme
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your Order'),
+        title: Text(AppTranslations.of(context, 'cart')),
       ),
       body: ValueListenableBuilder<List<CartItem>>(
         valueListenable: cartService.itemsNotifier,
         builder: (context, items, _) {
           if (items.isEmpty) {
-            return const Center(child: Text('Your cart is empty.'));
+            return Center(
+                child: Text(AppTranslations.of(context, 'emptyCart')));
           }
 
           return Column(
@@ -127,10 +129,11 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
           Navigator.pop(context); // Close Cart
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Order placed! Go to "Orders" tab to track it.'),
+            SnackBar(
+              content: Text(
+                  '${AppTranslations.of(context, 'orderPlaced')} ${AppTranslations.of(context, 'checkOrdersTab')}'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 4),
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -180,8 +183,8 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
                       const SizedBox(width: 8),
                       Text(
                         tableNumber != null
-                            ? 'Mesa $tableNumber'
-                            : 'No Table (Takeaway)',
+                            ? '${AppTranslations.of(context, 'table')} $tableNumber'
+                            : AppTranslations.of(context, 'noTable'),
                         style: TextStyle(
                             color: isDark ? Colors.white : Colors.black87,
                             fontWeight: FontWeight.bold),
@@ -194,7 +197,7 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total:',
+                Text(AppTranslations.of(context, 'total'),
                     style: const TextStyle(
                         fontSize: 20, fontWeight: FontWeight.bold)),
                 Text(
@@ -219,8 +222,9 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
                 onPressed: _isLoading ? null : _placeOrder,
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('SEND ORDER',
-                        style: TextStyle(
+                    : Text(
+                        AppTranslations.of(context, 'placeOrder').toUpperCase(),
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/app_translations.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -53,7 +54,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
               if (payload.eventType == PostgresChangeEvent.insert) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('🔔 New Order Received!')),
+                  SnackBar(
+                      content: Text(
+                          AppTranslations.of(context, 'newOrderNotification'))),
                 );
               }
             }
@@ -187,7 +190,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
     if (session == null) {
       return Scaffold(
         appBar: AppBar(
-            title: const Text('Kitchen Login'),
+            title: Text(AppTranslations.of(context, 'kitchenLogin')),
             backgroundColor: Colors.black,
             foregroundColor: Colors.white),
         backgroundColor: const Color(0xFF1a1a1a),
@@ -244,7 +247,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
                         child: _isLoading
                             ? const CircularProgressIndicator(
                                 color: Colors.white)
-                            : const Text('LOGIN TO KITCHEN'),
+                            : Text(
+                                AppTranslations.of(context, 'loginToKitchen')),
                       ),
                     ),
                   ],
@@ -258,7 +262,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kitchen Display (Hybrid 🔌)'),
+        title: Text(AppTranslations.of(context, 'kitchenDisplayTitle')),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
@@ -289,15 +293,16 @@ class _KitchenScreenState extends State<KitchenScreen> {
           final orders = snapshot.data ?? [];
 
           if (orders.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle_outline,
+                  const Icon(Icons.check_circle_outline,
                       size: 64, color: Colors.green),
-                  SizedBox(height: 16),
-                  Text('All good! No active orders.',
-                      style: TextStyle(color: Colors.white70, fontSize: 18)),
+                  const SizedBox(height: 16),
+                  Text(AppTranslations.of(context, 'noOrdersKitchen'),
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 18)),
                 ],
               ),
             );
@@ -385,8 +390,8 @@ class _OrderCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         order['tables'] != null
-                            ? 'Mesa ${order['tables']['table_number']}'
-                            : 'Viagem',
+                            ? '${AppTranslations.of(context, 'table')} ${order['tables']['table_number']}'
+                            : AppTranslations.of(context, 'takeaway'),
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -439,7 +444,8 @@ class _OrderCard extends StatelessWidget {
                                 style: const TextStyle(
                                     color: Colors.white, fontSize: 16)),
                             if (notes != null && notes.toString().isNotEmpty)
-                              Text('Note: $notes',
+                              Text(
+                                  '${AppTranslations.of(context, 'note')}: $notes',
                                   style: TextStyle(
                                       color: Colors.red[200],
                                       fontSize: 14,
@@ -466,7 +472,9 @@ class _OrderCard extends StatelessWidget {
                 ),
                 icon: Icon(isPending ? Icons.restaurant : Icons.check),
                 label: Text(
-                  isPending ? 'START PREPARING' : 'MARK AS READY',
+                  isPending
+                      ? AppTranslations.of(context, 'startPreparing')
+                      : AppTranslations.of(context, 'markAsReady'),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),

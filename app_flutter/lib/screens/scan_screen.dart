@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/table_service.dart';
 import 'main_screen.dart';
+import '../services/app_translations.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -36,7 +37,8 @@ class _ScanScreenState extends State<ScanScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Invalid Table QR Code: $code'),
+                content:
+                    Text('${AppTranslations.of(context, 'invalidQR')}: $code'),
                 backgroundColor: Colors.red),
           );
           _isScanned = false; // Allow retry
@@ -51,7 +53,8 @@ class _ScanScreenState extends State<ScanScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Mesa $tableNumber confirmada!'),
+              content: Text(
+                  '${AppTranslations.of(context, 'table')} $tableNumber ${AppTranslations.of(context, 'tableConfirmed')}'),
               backgroundColor: Colors.green),
         );
 
@@ -90,7 +93,7 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan Table QR Code')),
+      appBar: AppBar(title: Text(AppTranslations.of(context, 'scanTable'))),
       body: MobileScanner(
         controller: _controller,
         onDetect: _onDetect,
@@ -101,7 +104,9 @@ class _ScanScreenState extends State<ScanScreen> {
               children: [
                 const Icon(Icons.error, color: Colors.red, size: 48),
                 const SizedBox(height: 16),
-                Text('Camera Error: ${error.errorCode}'),
+                const SizedBox(height: 16),
+                Text(
+                    '${AppTranslations.of(context, 'cameraError')}: ${error.errorCode}'),
               ],
             ),
           );
