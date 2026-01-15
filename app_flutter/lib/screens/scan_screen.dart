@@ -95,7 +95,10 @@ class _ScanScreenState extends State<ScanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content:
+                  Text('${AppTranslations.of(context, 'generalError')} $e'),
+              backgroundColor: Colors.red),
         );
         _isScanned = false;
       }

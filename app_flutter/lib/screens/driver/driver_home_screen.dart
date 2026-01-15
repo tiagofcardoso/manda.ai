@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../services/auth_service.dart';
 import '../admin/admin_login_screen.dart';
 import 'driver_orders_screen.dart';
+import '../../services/app_translations.dart';
 
 class DriverHomeScreen extends StatelessWidget {
   const DriverHomeScreen({super.key});
@@ -12,7 +13,7 @@ class DriverHomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Driver Dashboard'),
+        title: Text(AppTranslations.of(context, 'driverDashboard')),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -52,11 +53,12 @@ class DriverHomeScreen extends StatelessWidget {
                     const Icon(LucideIcons.bike, size: 64, color: Colors.green),
               ),
               const SizedBox(height: 24),
-              const Text('Welcome, Driver!',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Text(AppTranslations.of(context, 'driverWelcome'),
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text(
-                'You are online and ready to receive orders.',
+                AppTranslations.of(context, 'driverStatus'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
@@ -78,7 +80,7 @@ class DriverHomeScreen extends StatelessWidget {
                     );
                   },
                   icon: const Icon(LucideIcons.map),
-                  label: const Text('Go to Map / Orders'),
+                  label: Text(AppTranslations.of(context, 'goToMap')),
                 ),
               )
             ],

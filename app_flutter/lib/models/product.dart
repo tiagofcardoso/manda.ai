@@ -5,6 +5,7 @@ class Product {
   final double price;
   final String? imageUrl;
   final String? categoryId;
+  final String currency;
 
   Product({
     required this.id,
@@ -13,6 +14,7 @@ class Product {
     required this.price,
     this.imageUrl,
     this.categoryId,
+    this.currency = '€',
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Product {
       price: (json['price'] as num).toDouble(),
       imageUrl: json['image_url'] as String?,
       categoryId: json['category_id']?.toString(),
+      currency: json['currency'] as String? ?? '€',
     );
   }
 }

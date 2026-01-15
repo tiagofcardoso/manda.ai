@@ -24,6 +24,9 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
   final _priceController = TextEditingController();
   final _imageController = TextEditingController();
   String? _selectedCategory;
+  String _selectedCurrency = '€';
+  final List<String> _currencies = ['€', '\$', 'R\$', 'Kz', 'CVE', 'MT'];
+
   bool _isLoading = false;
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
@@ -36,7 +39,9 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
       _descController.text = widget.product!.description ?? '';
       _priceController.text = widget.product!.price.toString();
       _imageController.text = widget.product!.imageUrl ?? '';
+      _imageController.text = widget.product!.imageUrl ?? '';
       _selectedCategory = widget.product!.categoryId;
+      _selectedCurrency = widget.product!.currency;
     }
   }
 
@@ -118,6 +123,7 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
         'image_url': _imageController.text.trim(),
         'category_id': _selectedCategory,
+        'currency': _selectedCurrency,
         'is_available': true,
       });
 
@@ -189,6 +195,32 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
               _buildTextField(
                   context, _priceController, 'productPrice', Icons.attach_money,
                   keyboardType: TextInputType.number, required: true),
+              const SizedBox(height: 16),
+
+              // Currency Dropdown
+              DropdownButtonFormField<String>(
+                value: _selectedCurrency,
+                dropdownColor: const Color(0xFF2d2d2d),
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: AppTranslations.of(context, 'currency'),
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  prefixIcon:
+                      const Icon(Icons.monetization_on, color: Colors.white54),
+                  enabledBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white30)),
+                  focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white)),
+                  contentPadding: const EdgeInsets.all(16),
+                ),
+                items: _currencies.map((curr) {
+                  return DropdownMenuItem<String>(
+                    value: curr,
+                    child: Text(curr),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => _selectedCurrency = val!),
+              ),
               const SizedBox(height: 16),
 
               // Image Picker Section

@@ -19,6 +19,8 @@ class AuthService {
     required String password,
     required String fullName,
     String role = 'client',
+    String? phone,
+    Map<String, dynamic>? address,
   }) async {
     return await _supabase.auth.signUp(
       email: email,
@@ -26,6 +28,8 @@ class AuthService {
       data: {
         'full_name': fullName,
         'role': role,
+        if (phone != null) 'phone': phone,
+        if (address != null) 'address': address,
       },
     );
   }

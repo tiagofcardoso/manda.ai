@@ -116,6 +116,54 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
     }
   }
 
+  Future<Map<String, dynamic>?> _fetchOrderDetails(String orderId) async {
+    try {
+      // 1. Fetch Order
+      final order =
+          await _supabase.from('orders').select().eq('id', orderId).single();
+
+      Map<String, dynamic>? profile;
+      Map<String, dynamic>? establishment;
+
+      // 2. Fetch Profile (Client)
+      if (order['user_id'] != null) {
+        try {
+          profile = await _supabase
+              .from('profiles')
+              .select()
+              .eq('id', order['user_id'])
+              .single();
+        } catch (e) {
+          debugPrint('Profile fetch error: $e');
+        }
+      }
+
+      // 3. Fetch Establishment
+      if (order['establishment_id'] != null) {
+        try {
+          establishment = await _supabase
+              .from('establishments')
+              .select()
+              .eq('id', order['establishment_id'])
+              .single();
+        } catch (e) {
+          debugPrint('Establishment fetch error: $e');
+        }
+      }
+
+      // Merge and return
+      return {
+        ...order,
+        'profiles': profile,
+        'establishments': establishment,
+        'debug_error': null,
+      };
+    } catch (e) {
+      debugPrint('Error fetching order details: $e');
+      return {'debug_error': e.toString()};
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -250,15 +298,81 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
               ],
             ),
             const SizedBox(height: 8),
-            // Mock Address Info
-            const Row(
-              children: [
-                Icon(LucideIcons.mapPin, size: 16, color: Colors.grey),
-                SizedBox(width: 4),
-                Text('Delivery to: Rua Principal, 123',
-                    style: TextStyle(color: Colors.grey)),
-              ],
+            const SizedBox(height: 8),
+
+            // Real Address Info via FutureBuilder
+            FutureBuilder<Map<String, dynamic>?>(
+              future: _fetchOrderDetails(orderId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Text('Loading addresses...',
+                      style: TextStyle(color: Colors.grey, fontSize: 12));
+                }
+
+                final data = snapshot.data ?? {};
+                final est = data['establishments'];
+                final profile = data['profiles'];
+                final debugError = data['debug_error'];
+
+                // Debug Dropoff Reason
+                String dropoffAddr = 'Unknown Dropoff';
+                if (debugError != null) {
+                  dropoffAddr = 'Error: $debugError';
+                } else if (data['user_id'] == null) {
+                  dropoffAddr = 'Unknown Client (Guest/Test Order)';
+                } else if (profile == null) {
+                  dropoffAddr = 'Profile Not Found (ID: ${data['user_id']})';
+                } else {
+                  final street = profile['street'];
+                  final city = profile['city'];
+                  if (street == null || (street as String).isEmpty) {
+                    dropoffAddr = '${profile['full_name']} (Address Empty)';
+                  } else {
+                    dropoffAddr = '${profile['full_name']} - $street $city';
+                  }
+                }
+
+                final pickupAddr = est != null
+                    ? '${est['name']} - ${est['street'] ?? 'No Street'} ${est['city'] ?? ''}'
+                    : 'Unknown Pickup (Est ID: ${data['establishment_id']})';
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Pickup
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(LucideIcons.store,
+                            size: 16, color: Colors.blueGrey),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text('Pickup: $pickupAddr',
+                              style: const TextStyle(
+                                  color: Colors.blueGrey, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Dropoff
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(LucideIcons.mapPin,
+                            size: 16, color: Colors.orange),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text('Drop-off: $dropoffAddr',
+                              style: const TextStyle(
+                                  color: Colors.blueGrey, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
+
             const SizedBox(height: 16),
             if (isMyDelivery)
               Row(

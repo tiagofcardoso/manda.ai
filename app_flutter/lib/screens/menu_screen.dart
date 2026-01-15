@@ -11,7 +11,9 @@ import 'kitchen_screen.dart';
 import '../services/theme_service.dart';
 import '../services/app_translations.dart';
 import '../services/locale_service.dart';
+import '../services/auth_service.dart';
 import 'admin/admin_login_screen.dart';
+import 'driver/driver_home_screen.dart';
 import 'scan_screen.dart';
 import '../constants/categories.dart';
 import 'package:flutter/services.dart'; // For barcode scanner usually, but using mock for now or simple dialog logic
@@ -27,6 +29,20 @@ class _MenuScreenState extends State<MenuScreen> {
   final _supabase = Supabase.instance.client;
   final _cartService = CartService();
   String _selectedCategory = 'all';
+  String? _userRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserRole();
+  }
+
+  Future<void> _fetchUserRole() async {
+    final role = await AuthService().getUserRole();
+    if (mounted) {
+      setState(() => _userRole = role);
+    }
+  }
 
   Future<List<Product>> _fetchProducts() async {
     final response = await _supabase
@@ -67,6 +83,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTableMode = _cartService.tableId != null;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -91,82 +108,123 @@ class _MenuScreenState extends State<MenuScreen> {
                         fontSize: 28,
                         fontWeight: FontWeight.bold),
                   ),
-                  Text('Restaurant OS',
+                  Text(
+                      _userRole == 'driver'
+                          ? AppTranslations.of(context, 'driverApp')
+                          : (isTableMode
+                              ? '${AppTranslations.of(context, 'tableService')}: ${_cartService.tableId}'
+                              : AppTranslations.of(context, 'restaurantOS')),
                       style: TextStyle(
                           color: Colors.white.withOpacity(0.8), fontSize: 14)),
                 ],
               ),
             ),
-            ListTile(
-              leading: Icon(LucideIcons.utensils,
-                  color: isDark ? Colors.white : Colors.black),
-              title: Text('Customer Menu',
-                  style:
-                      TextStyle(color: isDark ? Colors.white : Colors.black)),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: Icon(LucideIcons.qrCode,
-                  color: isDark ? Colors.white : Colors.black),
-              title: Text('Scan Table QR',
-                  style:
-                      TextStyle(color: isDark ? Colors.white : Colors.black)),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to REAL Scanner
-                Navigator.push(
+            if (_userRole == 'driver') ...[
+              ListTile(
+                leading: Icon(LucideIcons.bike,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'driverDashboard'),
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const ScanScreen()));
-              },
-            ),
+                        builder: (context) => const DriverHomeScreen()),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(LucideIcons.logOut, color: Colors.red),
+                title: Text(AppTranslations.of(context, 'logout'),
+                    style: const TextStyle(
+                        color: Colors.red, fontWeight: FontWeight.bold)),
+                onTap: () async {
+                  await AuthService().signOut();
+                  Navigator.pop(context); // Close Drawer
+                  setState(() => _userRole = null); // Update UI to Client Mode
+                },
+              ),
+            ] else ...[
+              // Standard Client Menu
+              ListTile(
+                leading: Icon(LucideIcons.utensils,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'customerMenu'),
+                    style:
+                        TextStyle(color: isDark ? Colors.white : Colors.black)),
+                onTap: () => Navigator.pop(context),
+              ),
+              if (!isTableMode)
+                ListTile(
+                  leading: Icon(LucideIcons.qrCode,
+                      color: isDark ? Colors.white : Colors.black),
+                  title: Text(AppTranslations.of(context, 'scanTableQR'),
+                      style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ScanScreen()));
+                  },
+                ),
 
-            const Divider(),
-            ListTile(
-              leading: Icon(LucideIcons.chefHat,
-                  color: isDark ? Colors.white : Colors.black),
-              title: Text('Kitchen Display (KDS)',
-                  style:
-                      TextStyle(color: isDark ? Colors.white : Colors.black)),
-              subtitle: const Text('Realtime Orders'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const KitchenScreen()));
-              },
-            ),
-            const Divider(), // Another divider for separation
-            ListTile(
-              leading: Icon(LucideIcons.shield,
-                  color: isDark ? Colors.white : Colors.black),
-              title: Text(AppTranslations.of(context, 'managerArea'),
-                  style:
-                      TextStyle(color: isDark ? Colors.white : Colors.black)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const AdminLoginScreen()));
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(LucideIcons.logIn,
-                  color: isDark ? Colors.white : Colors.black),
-              title: Text(AppTranslations.of(context, 'login'),
-                  style:
-                      TextStyle(color: isDark ? Colors.white : Colors.black)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const AdminLoginScreen()));
-              },
-            ),
+              if (!isTableMode) ...[
+                const Divider(),
+                ListTile(
+                  leading: Icon(LucideIcons.chefHat,
+                      color: isDark ? Colors.white : Colors.black),
+                  title: Text(AppTranslations.of(context, 'kitchenDisplay'),
+                      style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black)),
+                  subtitle: const Text('Realtime Orders'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const KitchenScreen()));
+                  },
+                ),
+              ],
+              if (!isTableMode) ...[
+                const Divider(),
+                ListTile(
+                  leading: Icon(LucideIcons.shield,
+                      color: isDark ? Colors.white : Colors.black),
+                  title: Text(AppTranslations.of(context, 'managerArea'),
+                      style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const AdminLoginScreen()));
+                  },
+                ),
+              ],
+              const Divider(),
+              ListTile(
+                leading: Icon(LucideIcons.logIn,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'login'),
+                    style:
+                        TextStyle(color: isDark ? Colors.white : Colors.black)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AdminLoginScreen()));
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -212,6 +270,47 @@ class _MenuScreenState extends State<MenuScreen> {
       body: FutureBuilder<List<Product>>(
         future: _fetchProducts(),
         builder: (context, snapshot) {
+          if (_userRole == 'driver') {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(LucideIcons.bike, size: 80, color: Colors.green),
+                  const SizedBox(height: 24),
+                  Text(
+                    AppTranslations.of(context, 'driverModeActive'),
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    AppTranslations.of(context, 'driverModeMessage'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 16),
+                    ),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const DriverHomeScreen()),
+                      );
+                    },
+                    icon: const Icon(LucideIcons.layoutDashboard),
+                    label: Text(AppTranslations.of(context, 'goToDashboard')),
+                  ),
+                ],
+              ),
+            );
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
                 child: CircularProgressIndicator(color: Colors.white));
@@ -345,7 +444,8 @@ class _MenuScreenState extends State<MenuScreen> {
                           final width = constraints.maxWidth;
                           final crossAxisCount =
                               width > 600 ? 3 : (width > 400 ? 2 : 1);
-                          final aspectRatio = width > 600 ? 0.68 : 0.65;
+                          final aspectRatio =
+                              width > 600 ? 0.85 : 0.8; // Shorter cards
 
                           return GridView.builder(
                             padding: const EdgeInsets.all(16),
@@ -463,7 +563,7 @@ class _MenuScreenState extends State<MenuScreen> {
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.start, // content at top
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,16 +586,17 @@ class _MenuScreenState extends State<MenuScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          height: 1.2,
+                          height: 1.1,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        NumberFormat.currency(symbol: '€')
+                        NumberFormat.currency(symbol: product.currency)
                             .format(product.price),
                         style: const TextStyle(
                           fontSize: 18,
@@ -503,8 +604,24 @@ class _MenuScreenState extends State<MenuScreen> {
                           color: Color(0xFFE63946),
                         ),
                       ),
-                      InkWell(
+                      // Add Button
+                      GestureDetector(
                         onTap: () {
+                          // Admin Restriction
+                          if (_userRole == 'admin' || _userRole == 'manager') {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(AppTranslations.of(
+                                    context, 'adminRestriction')),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
                           _cartService.addToCart(product);
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -515,7 +632,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                       color: Colors.green),
                                   const SizedBox(width: 8),
                                   // Text must be black on light yellow background
-                                  Text('${product.name} added to cart!',
+                                  Text(
+                                      '${product.name} ${AppTranslations.of(context, 'itemAdded')}',
                                       style: const TextStyle(
                                           color: Colors.black87)),
                                 ],
@@ -531,12 +649,19 @@ class _MenuScreenState extends State<MenuScreen> {
                         },
                         child: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE63946),
+                          decoration: BoxDecoration(
+                            color:
+                                (_userRole == 'admin' || _userRole == 'manager')
+                                    ? Colors.grey
+                                    : const Color(0xFFE63946),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(LucideIcons.plus,
-                              color: Colors.white, size: 20),
+                          child: Icon(
+                              (_userRole == 'admin' || _userRole == 'manager')
+                                  ? LucideIcons.lock
+                                  : LucideIcons.plus,
+                              color: Colors.white,
+                              size: 20),
                         ),
                       ),
                     ],

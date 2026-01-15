@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/app_translations.dart';
 import '../utils/image_helper.dart';
+import '../constants/api.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -33,10 +34,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
   // Helper for Backend URL
   String get _baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:8000';
-    if (defaultTargetPlatform == TargetPlatform.android)
-      return 'http://10.0.2.2:8000';
-    return 'http://127.0.0.1:8000';
+    return ApiConstants.baseUrl;
   }
 
   void _setupRealtimeSubscription() {
@@ -108,7 +106,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
       if (token == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error: Not Authenticated!')),
+            SnackBar(
+                content:
+                    Text(AppTranslations.of(context, 'errorNotAuthenticated'))),
           );
         }
         return;
@@ -127,7 +127,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
       if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Order updated to $newStatus!')),
+            SnackBar(
+                content: Text(
+                    '${AppTranslations.of(context, 'orderUpdated')} $newStatus!')),
           );
           // Subscription will trigger refresh, but we can optimistically fetch too
           setState(() {});
@@ -139,7 +141,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error updating status: $e'),
+              content: Text(
+                  '${AppTranslations.of(context, 'errorUpdatingStatus')} $e'),
               backgroundColor: Colors.red),
         );
       }
@@ -164,14 +167,18 @@ class _KitchenScreenState extends State<KitchenScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Login Failed: ${e.message}'),
+              content: Text(
+                  '${AppTranslations.of(context, 'loginFailed')} ${e.message}'),
               backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content:
+                  Text('${AppTranslations.of(context, 'generalError')} $e'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -215,7 +222,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                       controller: _emailController,
                       style: TextStyle(color: textColor),
                       decoration: InputDecoration(
-                        labelText: 'Email',
+                        labelText: AppTranslations.of(context, 'email'),
                         labelStyle:
                             TextStyle(color: textColor?.withOpacity(0.7)),
                         enabledBorder: OutlineInputBorder(
@@ -233,7 +240,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                       obscureText: true,
                       style: TextStyle(color: textColor),
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: AppTranslations.of(context, 'password'),
                         labelStyle:
                             TextStyle(color: textColor?.withOpacity(0.7)),
                         enabledBorder: OutlineInputBorder(
