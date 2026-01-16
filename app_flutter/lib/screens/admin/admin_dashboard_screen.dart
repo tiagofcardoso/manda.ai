@@ -5,12 +5,15 @@ import '../../services/app_translations.dart';
 import 'admin_products_screen.dart';
 import 'admin_sales_screen.dart';
 
+import '../../widgets/app_drawer.dart';
+
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: Text(AppTranslations.of(context, 'adminDashboard')),
         backgroundColor: Colors.black,

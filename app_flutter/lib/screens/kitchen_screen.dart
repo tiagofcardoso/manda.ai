@@ -8,6 +8,7 @@ import 'dart:convert';
 import '../services/app_translations.dart';
 import '../utils/image_helper.dart';
 import '../constants/api.dart';
+import '../widgets/app_drawer.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -278,6 +279,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
     }
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: Text(AppTranslations.of(context, 'kitchenDisplayTitle'),
             style: TextStyle(color: textColor)),

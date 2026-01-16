@@ -5,6 +5,7 @@ import '../order_tracking_screen.dart';
 import '../../constants/api.dart';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
+import '../../services/auth_service.dart';
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -19,6 +20,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
   final _supabase = Supabase.instance.client;
   late Stream<List<Map<String, dynamic>>> _myDeliveriesStream;
   late Stream<List<Map<String, dynamic>>> _poolStream;
+
+  String? _userRole;
+  bool _roleLoading = true;
+  List<Map<String, dynamic>> _drivers = [];
 
   @override
   void initState() {
@@ -44,6 +49,31 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
         .stream(primaryKey: ['id'])
         .eq('status', 'open')
         .order('updated_at', ascending: false);
+
+    _fetchRoleAndDrivers();
+  }
+
+  Future<void> _fetchRoleAndDrivers() async {
+    final role = await AuthService().getUserRole();
+    if (mounted) {
+      setState(() {
+        _userRole = role;
+        _roleLoading = false;
+      });
+    }
+
+    if (role == 'admin' || role == 'manager') {
+      final response = await _supabase
+          .from('profiles')
+          .select()
+          .eq('role', 'driver')
+          .order('full_name', ascending: true);
+      if (mounted) {
+        setState(() {
+          _drivers = List<Map<String, dynamic>>.from(response);
+        });
+      }
+    }
   }
 
   @override
@@ -87,6 +117,75 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
         );
       }
     }
+  }
+
+  Future<void> _assignDriver(String deliveryId, String driverId) async {
+    try {
+      // Direct Admin Override: Assign driver and set status to 'assigned'
+      await _supabase.from('deliveries').update({
+        'driver_id': driverId,
+        'status': 'assigned',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', deliveryId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Driver Assigned! 📋'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error assigning driver: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showAssignmentDialog(String deliveryId) {
+    if (_drivers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('No drivers found!'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Assign Driver'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _drivers.length,
+            itemBuilder: (context, index) {
+              final driver = _drivers[index];
+              return ListTile(
+                leading: const Icon(LucideIcons.user),
+                title: Text(driver['full_name'] ?? 'Unknown'),
+                subtitle: Text(driver['email'] ?? ''),
+                onTap: () {
+                  Navigator.pop(context); // Close dialog
+                  _assignDriver(deliveryId, driver['id']);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _advanceDeliveryStatus(
@@ -448,30 +547,59 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                                     ),
                                   ],
                                 ))
-                          : SizedBox(
-                              width: double.infinity,
-                              child: canAccept
-                                  ? ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 12)),
-                                      icon: const Icon(LucideIcons.check),
-                                      label: const Text('ACCEPT DELIVERY'),
-                                      onPressed: () =>
-                                          _acceptDelivery(delivery['id']),
-                                    )
-                                  : ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.grey,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 12)),
-                                      icon: const Icon(LucideIcons.clock),
-                                      label: const Text('WAITING FOR READY'),
-                                      onPressed: null, // Disabled
-                                    ),
+                          : Column(
+                              children: [
+                                if (_roleLoading)
+                                  const SizedBox(
+                                      height: 48,
+                                      child: Center(
+                                          child: CircularProgressIndicator()))
+                                else if (_userRole == 'admin' ||
+                                    _userRole == 'manager')
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.purple,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        minimumSize:
+                                            const Size(double.infinity, 48)),
+                                    icon: const Icon(LucideIcons.clipboardList),
+                                    label: const Text('ASSIGN DRIVER'),
+                                    onPressed: () =>
+                                        _showAssignmentDialog(delivery['id']),
+                                  )
+                                else
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: canAccept
+                                        ? ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.green,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 12)),
+                                            icon: const Icon(LucideIcons.check),
+                                            label:
+                                                const Text('ACCEPT DELIVERY'),
+                                            onPressed: () =>
+                                                _acceptDelivery(delivery['id']),
+                                          )
+                                        : ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.grey,
+                                                foregroundColor: Colors.white,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 12)),
+                                            icon: const Icon(LucideIcons.clock),
+                                            label:
+                                                const Text('WAITING FOR READY'),
+                                            onPressed: null, // Disabled
+                                          ),
+                                  ),
+                              ],
                             ),
                     )
                   ],

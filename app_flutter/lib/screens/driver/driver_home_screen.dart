@@ -5,12 +5,15 @@ import '../admin/admin_login_screen.dart';
 import 'driver_orders_screen.dart';
 import '../../services/app_translations.dart';
 
+import '../../widgets/app_drawer.dart';
+
 class DriverHomeScreen extends StatelessWidget {
   const DriverHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(),
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(AppTranslations.of(context, 'driverDashboard')),

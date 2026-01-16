@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'menu_screen.dart';
 import 'order_tracking_screen.dart';
-
 import 'package:manda_client/services/app_translations.dart';
+import '../widgets/app_drawer.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -22,7 +22,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const MenuScreen(),
-    const OrderTrackingScreen(), // Refactored to handle null orderId internally
+    const OrderTrackingScreen(),
   ];
 
   @override
@@ -31,6 +31,7 @@ class _MainScreenState extends State<MainScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
