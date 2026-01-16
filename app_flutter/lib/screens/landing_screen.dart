@@ -12,11 +12,14 @@ class LandingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1a1a1a), Color(0xFF2d2d2d)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/background_manda.jpg'),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.6), // Dark overlay for readability
+              BlendMode.darken,
+            ),
           ),
         ),
         child: Center(
