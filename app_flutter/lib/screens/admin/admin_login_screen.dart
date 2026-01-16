@@ -6,6 +6,7 @@ import 'admin_dashboard_screen.dart';
 import '../../services/auth_service.dart';
 import '../auth/signup_screen.dart';
 import '../driver/driver_home_screen.dart';
+import '../main_screen.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -54,9 +55,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         );
       }
     } else {
-      // Client - Pop back to menu
+      // Client - Redirect to Main Screen (Menu)
       if (mounted) {
-        Navigator.pop(context); // Return to menu as authenticated user
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
       }
     }
   }

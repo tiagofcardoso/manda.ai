@@ -48,7 +48,7 @@ class MandaApp extends StatelessWidget {
             valueListenable: LocaleService().localeNotifier,
             builder: (context, locale, _) {
               return MaterialApp(
-                title: 'Manda.AI Client',
+                title: 'Manda.AI',
                 debugShowCheckedModeBanner: false,
                 themeMode: themeMode,
                 // Localizations

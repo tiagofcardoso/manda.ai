@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'scan_screen.dart';
-import 'main_screen.dart';
-import '../services/table_service.dart';
+import 'admin/admin_login_screen.dart';
 import '../services/app_translations.dart';
 
 class LandingScreen extends StatelessWidget {
@@ -26,34 +25,7 @@ class LandingScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo or Placeholder
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE63946),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(LucideIcons.utensils,
-                    size: 64, color: Colors.white),
-              ),
-              const SizedBox(height: 32),
-              const SizedBox(height: 32),
-              Text(
-                AppTranslations.of(context, 'welcomeMessage'),
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                AppTranslations.of(context, 'scanInstruction'),
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 48),
-
-              // Scan Button
+              // 1. Scan Button (Primary)
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -67,26 +39,38 @@ class LandingScreen extends StatelessWidget {
                   backgroundColor: const Color(0xFFE63946),
                   foregroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  textStyle: const TextStyle(fontSize: 18),
+                      const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                  textStyle: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              // Demo/Skip Button
-              TextButton(
+              // 2. Login Delivery Button (Secondary)
+              OutlinedButton(
                 onPressed: () {
-                  // Set Dummy Table ID for testing
-                  TableService().setTable(
-                      '11111111-1111-1111-1111-111111111111', '01 (Demo)');
-                  Navigator.pushReplacement(
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const MainScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const AdminLoginScreen()),
                   );
                 },
-                child: Text(AppTranslations.of(context, 'skipDemo'),
-                    style: const TextStyle(color: Colors.white54)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white, width: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                  textStyle: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text('Login Delivery'),
               ),
             ],
           ),
