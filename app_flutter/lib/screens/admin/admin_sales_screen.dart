@@ -42,9 +42,13 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
 
   Future<void> _fetchChartData() async {
     try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) return;
+
       final url = Uri.parse(
           '${ApiConstants.baseUrl}/admin/stats/sales?period=$_selectedPeriod');
-      final response = await http.get(url);
+      final response = await http.get(url,
+          headers: {'Authorization': 'Bearer ${session.accessToken}'});
       if (response.statusCode == 200) {
         if (mounted) setState(() => _chartData = jsonDecode(response.body));
       }
@@ -55,9 +59,13 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
 
   Future<void> _fetchTopProducts() async {
     try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) return;
+
       final url =
           Uri.parse('${ApiConstants.baseUrl}/admin/stats/top_products?limit=5');
-      final response = await http.get(url);
+      final response = await http.get(url,
+          headers: {'Authorization': 'Bearer ${session.accessToken}'});
       if (response.statusCode == 200) {
         if (mounted) setState(() => _topProducts = jsonDecode(response.body));
       }

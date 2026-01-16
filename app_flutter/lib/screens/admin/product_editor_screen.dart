@@ -132,15 +132,23 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
               '${ApiConstants.baseUrl}/admin/products/${widget.product!.id}')
           : Uri.parse('${ApiConstants.baseUrl}/admin/products');
 
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) throw Exception('No active session');
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${session.accessToken}',
+      };
+
       final response = widget.product != null
           ? await http.put(
               url,
-              headers: {'Content-Type': 'application/json'},
+              headers: headers,
               body: body,
             )
           : await http.post(
               url,
-              headers: {'Content-Type': 'application/json'},
+              headers: headers,
               body: body,
             );
 

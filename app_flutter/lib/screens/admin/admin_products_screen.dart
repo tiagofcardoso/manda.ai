@@ -33,7 +33,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     try {
       final url =
           Uri.parse('${ApiConstants.baseUrl}/admin/products/${product.id}');
-      final response = await http.delete(url);
+      final session = _supabase.auth.currentSession;
+      if (session == null) throw Exception('No active session');
+
+      final response = await http.delete(
+        url,
+        headers: {'Authorization': 'Bearer ${session.accessToken}'},
+      );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (mounted) {
