@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 
 import '../services/app_translations.dart';
 import '../utils/image_helper.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String? orderId;
@@ -66,22 +68,123 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     // Check Role
     final role = await AuthService().getUserRole();
-    if (role != 'client') {
-      // Admin/Driver - Do not load cached order
+    if (role != 'client' && role != 'driver') {
+      // Admin - Do not load cached order (Drivers allowed if orderId is passed)
+      // Note: We might want to verify the driver is assigned to THIS order, but for now we trust `driver_orders_screen` passed a valid ID.
       if (mounted) setState(() => _activeOrderId = null);
       return;
     }
 
-    // If Client, proceed
+    // If Client or Driver, proceed
     final orderId = widget.orderId ?? OrderService().currentOrderId;
     if (orderId != null) {
       if (mounted) setState(() => _activeOrderId = orderId);
       _fetchInitialStatus();
       _subscribeToOrderUpdates();
+      // Fetch Dropoff Location for Map
+      _fetchDropoffLocation();
     }
 
     // Listen to global order changes (if a new order is placed from Cart)
     OrderService().currentOrderIdNotifier.addListener(_onOrderServiceChange);
+  }
+
+  Future<void> _fetchDropoffLocation() async {
+    if (_activeOrderId == null) return;
+    try {
+      final order = await _supabase
+          .from('orders')
+          .select('user_id, delivery_address')
+          .eq('id', _activeOrderId!)
+          .single();
+
+      String? addressQuery;
+
+      // 1. Try explicit address
+      if (order['delivery_address'] != null &&
+          order['delivery_address'].toString().isNotEmpty &&
+          order['delivery_address'] != 'Table Service') {
+        addressQuery = order['delivery_address'];
+      }
+      // 2. Fallback to Profile
+      else if (order['user_id'] != null) {
+        final profile = await _supabase
+            .from('profiles')
+            .select('street, city, country')
+            .eq('id', order['user_id'])
+            .single();
+
+        final street = profile['street'];
+        final city = profile['city'];
+        if (street != null && city != null) {
+          addressQuery = '$street, $city';
+        }
+      }
+
+      if (addressQuery != null) {
+        // Geocode via Nominatim (OpenStreetMap)
+        // Rate Limit: 1 request per second. User-Agent required.
+        final url = Uri.parse(
+            'https://nominatim.openstreetmap.org/search?q=$addressQuery&format=json&limit=1');
+        final response = await http
+            .get(url, headers: {'User-Agent': 'Manda.AI_DriverApp/1.0'});
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data is List && data.isNotEmpty) {
+            final lat = double.parse(data[0]['lat']);
+            final lon = double.parse(data[0]['lon']);
+            if (mounted) {
+              setState(() {
+                _destinationLocation = LatLng(lat, lon);
+              });
+              // Auto-fit Map after getting dropoff
+              _fitMapBounds();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching dropoff location: $e');
+    }
+  }
+
+  void _fitMapBounds() {
+    if (!_isMapReady) return;
+
+    final points = <LatLng>[_shopLocation]; // Always include shop
+    if (_driverLocation != null) points.add(_driverLocation!);
+    if (_destinationLocation != null) points.add(_destinationLocation!);
+
+    // SAFETY CHECK: Remove invalid/NaN points just in case
+    points.removeWhere((p) => p.latitude.isNaN || p.longitude.isNaN);
+    if (points.isEmpty) return;
+
+    // Check if we effectively have only 1 unique location
+    // (FlutterMap can crash if trying to fit bounds of size 0 with padding)
+    final first = points.first;
+    bool allSame = points.every((p) =>
+        (p.latitude - first.latitude).abs() < 0.0001 &&
+        (p.longitude - first.longitude).abs() < 0.0001);
+
+    if (points.length > 1 && !allSame) {
+      try {
+        _mapController.fitCamera(
+          CameraFit.coordinates(
+            coordinates: points,
+            padding: const EdgeInsets.all(40), // Reduced slightly
+            maxZoom: 18, // Prevent extreme zooming
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error fitting map bounds: $e');
+        // Fallback
+        _mapController.move(first, 15);
+      }
+    } else {
+      // Just center on the single/common point
+      _mapController.move(first, 15);
+    }
   }
 
   @override
@@ -166,10 +269,21 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             final newLat = payload.newRecord['current_lat'];
             final newLng = payload.newRecord['current_lng'];
             if (newLat != null && newLng != null) {
-              if (mounted) {
-                setState(() {
-                  _driverLocation = LatLng(newLat, newLng);
-                });
+              final lat = (newLat as num).toDouble();
+              final lng = (newLng as num).toDouble();
+              if (!lat.isNaN && !lng.isNaN) {
+                if (mounted) {
+                  setState(() {
+                    _driverLocation = LatLng(lat, lng);
+                  });
+                  // Auto-Pan to keep driver in view (optional, or just fit bounds)
+                  // For now, let's fit bounds only if users haven't interacted much,
+                  // but simpler to just fit bounds on major updates.
+                  // actually, continuous fitting might be annoying if user is panning.
+                  // Let's just fit ONCE initially or when significant change happens?
+                  // Re-fitting on every move is great for "Tracking Mode".
+                  _fitMapBounds();
+                }
               }
             }
           },
@@ -193,6 +307,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           setState(() {
             _driverLocation = LatLng(data['current_lat'], data['current_lng']);
           });
+          // Fit bounds after initial load
+          _fitMapBounds();
         }
       }
     } catch (e) {
@@ -294,6 +410,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                     initialCenter:
                                         _shopLocation, // Start at shop
                                     initialZoom: 14.5,
+                                    onMapReady: () {
+                                      _isMapReady = true;
+                                      _fitMapBounds();
+                                    },
                                   ),
                                   children: [
                                     TileLayer(
@@ -333,6 +453,17 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                                   color: Colors.red,
                                                   size: 30),
                                             ),
+                                          ),
+                                        // Dropoff Marker
+                                        if (_destinationLocation != null)
+                                          Marker(
+                                            point: _destinationLocation!,
+                                            width: 40,
+                                            height: 40,
+                                            child: const Icon(
+                                                LucideIcons.mapPin,
+                                                color: Colors.orange,
+                                                size: 40),
                                           ),
                                       ],
                                     ),
