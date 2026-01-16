@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 
+import '../services/auth_service.dart';
 import '../services/order_service.dart';
 import 'package:intl/intl.dart';
 
@@ -42,7 +43,39 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     _activeOrderId = widget.orderId ?? OrderService().currentOrderId;
 
     // If we have an order ID, start tracking
-    if (_activeOrderId != null) {
+    // STRICT CHECK: Only load if user is authenticated AND a client (or explicitly passed)
+    // Actually, just checking if user is NOT guest is a good start, but user specifically asked for "only client".
+    // However, AuthService().getUserRole() is async.
+    // Let's just check if user is null first. Guest should definitely see nothing.
+
+    // Better logic:
+    // If widget.orderId is provided (e.g. deep link), maybe allow? But safer to restrict.
+    // If OrderService().currentOrderId is used, definitely restrict.
+
+    // We will check role asynchronously in _checkAccess()
+    _checkAccessAndLoad();
+  }
+
+  Future<void> _checkAccessAndLoad() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      // Guest - Do not load cached order
+      if (mounted) setState(() => _activeOrderId = null);
+      return;
+    }
+
+    // Check Role
+    final role = await AuthService().getUserRole();
+    if (role != 'client') {
+      // Admin/Driver - Do not load cached order
+      if (mounted) setState(() => _activeOrderId = null);
+      return;
+    }
+
+    // If Client, proceed
+    final orderId = widget.orderId ?? OrderService().currentOrderId;
+    if (orderId != null) {
+      if (mounted) setState(() => _activeOrderId = orderId);
       _fetchInitialStatus();
       _subscribeToOrderUpdates();
     }

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'order_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -47,6 +48,8 @@ class AuthService {
 
   /// Sign Out
   Future<void> signOut() async {
+    // Clear any active order session to prevent data leakage to other users (e.g. Guest/Admin)
+    OrderService().clearOrder();
     await _supabase.auth.signOut();
   }
 
