@@ -400,51 +400,54 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: isMyDelivery
-                          ? Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(LucideIcons.map),
-                                    label: const Text('Map'),
-                                    onPressed: () {
-                                      Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (_) =>
-                                                  OrderTrackingScreen(
-                                                      orderId: orderId)));
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          delivery['status'] == 'in_progress'
+                          ? (delivery['status'] == 'delivered'
+                              ? const SizedBox
+                                  .shrink() // Hide ALL buttons if delivered
+                              : Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(LucideIcons.map),
+                                        label: const Text('Map'),
+                                        onPressed: () {
+                                          Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      OrderTrackingScreen(
+                                                          orderId: orderId)));
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: delivery['status'] ==
+                                                  'in_progress'
                                               ? Colors.green
                                               : Colors.blue,
-                                      foregroundColor: Colors.white,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        icon: Icon(
+                                            delivery['status'] == 'in_progress'
+                                                ? LucideIcons.checkCheck
+                                                : LucideIcons.play),
+                                        label: Text(
+                                          delivery['status'] == 'in_progress'
+                                              ? AppTranslations.of(
+                                                  context, 'finishDelivery')
+                                              : AppTranslations.of(
+                                                  context, 'startDelivery'),
+                                        ),
+                                        onPressed: () => _advanceDeliveryStatus(
+                                            delivery['id'],
+                                            delivery['status'],
+                                            orderId),
+                                      ),
                                     ),
-                                    icon: Icon(
-                                        delivery['status'] == 'in_progress'
-                                            ? LucideIcons.checkCheck
-                                            : LucideIcons.play),
-                                    label: Text(
-                                      delivery['status'] == 'in_progress'
-                                          ? AppTranslations.of(
-                                              context, 'finishDelivery')
-                                          : AppTranslations.of(
-                                              context, 'startDelivery'),
-                                    ),
-                                    onPressed: () => _advanceDeliveryStatus(
-                                        delivery['id'],
-                                        delivery['status'],
-                                        orderId),
-                                  ),
-                                ),
-                              ],
-                            )
+                                  ],
+                                ))
                           : SizedBox(
                               width: double.infinity,
                               child: canAccept
