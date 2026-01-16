@@ -307,7 +307,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     if (!_isMapReady) return;
 
     final points = <LatLng>[_shopLocation]; // Always include shop
-    if (_driverLocation != null) points.add(_driverLocation!);
+
+    // Include Driver ONLY if visible (Not pending/prep)
+    if (_driverLocation != null &&
+        _currentStatus != 'pending' &&
+        _currentStatus != 'prep') {
+      points.add(_driverLocation!);
+    }
+
     if (_destinationLocation != null) points.add(_destinationLocation!);
 
     // SAFETY CHECK: Remove invalid/NaN points just in case
@@ -403,7 +410,25 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
           callback: (payload) {
             final newStatus = payload.newRecord['status'];
-            if (mounted) setState(() => _currentStatus = newStatus);
+            if (mounted) {
+              setState(() => _currentStatus = newStatus);
+
+              // Auto-Close if Delivered
+              if (newStatus == 'delivered') {
+                Future.delayed(const Duration(seconds: 3), () {
+                  if (mounted) {
+                    OrderService().clearOrder();
+                    setState(() => _activeOrderId = null);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Order Completed! 🌟'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                });
+              }
+            }
           },
         )
         .subscribe();
@@ -523,6 +548,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         } else if (_currentStatus == 'completed') {
           statusColor = Colors.grey;
           statusText = 'Completed';
+        } else if (_currentStatus == 'delivered') {
+          statusColor = Colors.teal;
+          statusText = 'Delivered';
         }
 
         return Scaffold(
@@ -588,8 +616,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                           child: const Icon(LucideIcons.store,
                                               color: Colors.blue, size: 30),
                                         ),
-                                        // Driver Marker (Dynamic)
-                                        if (_driverLocation != null)
+                                        // Driver Marker (Only show if Driver is Assigned AND Status is valid)
+                                        // Hide if status is 'pending' or 'prep' even if driver exists (edge case)
+                                        if (_driverLocation != null &&
+                                            _currentStatus != 'pending' &&
+                                            _currentStatus != 'prep')
                                           Marker(
                                             point: _driverLocation!,
                                             width: 50,
@@ -624,34 +655,38 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                     ),
                                   ],
                                 ),
-                                // Overlay Status
-                                Positioned(
-                                  bottom: 10,
-                                  left: 10,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black87,
-                                      borderRadius: BorderRadius.circular(20),
+                                // Overlay Status (Only show if Driver Assigned & Not in Kitchen Phase)
+                                if (_currentStatus != 'pending' &&
+                                    _currentStatus != 'prep')
+                                  Positioned(
+                                    bottom: 10,
+                                    left: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          if (_driverLocation == null)
+                                            const Text(
+                                                'Waiting for driver assignment...',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12))
+                                          else
+                                            const Text('Driver on the way! 🛵',
+                                                style: TextStyle(
+                                                    color: Colors.greenAccent,
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.bold))
+                                        ],
+                                      ),
                                     ),
-                                    child: Row(
-                                      children: [
-                                        if (_driverLocation == null)
-                                          const Text('Waiting for driver...',
-                                              style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 12))
-                                        else
-                                          const Text('Driver on the way! 🛵',
-                                              style: TextStyle(
-                                                  color: Colors.greenAccent,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold))
-                                      ],
-                                    ),
-                                  ),
-                                )
+                                  )
                               ],
                             ),
                           ),

@@ -127,6 +127,8 @@ class AppTranslations {
       'country': 'Country',
       'requiredField': 'Required',
       'signInAction': 'Sign In',
+      'startDelivery': 'Start Delivery',
+      'finishDelivery': 'Done',
     },
     'pt': {
       'appTitle': 'Manda.AI',
@@ -252,6 +254,8 @@ class AppTranslations {
       'country': 'País',
       'requiredField': 'Obrigatório',
       'signInAction': 'Entrar',
+      'startDelivery': 'Iniciar Entrega',
+      'finishDelivery': 'Entregue',
     },
   };
 

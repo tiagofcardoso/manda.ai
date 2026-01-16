@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../order_tracking_screen.dart';
 import '../../constants/api.dart';
 import 'package:http/http.dart' as http;
+import '../../services/app_translations.dart';
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -88,28 +89,51 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
     }
   }
 
-  Future<void> _startSimulation(String orderId) async {
-    try {
-      final url = Uri.parse(
-          '${ApiConstants.baseUrl}/admin/deliveries/simulate/$orderId');
-      final response = await http.post(url);
+  Future<void> _advanceDeliveryStatus(
+      String deliveryId, String currentStatus, String orderId) async {
+    String newStatus;
+    // Cycle: assigned -> in_progress -> delivered
+    if (currentStatus == 'assigned') {
+      newStatus = 'in_progress';
+    } else if (currentStatus == 'in_progress') {
+      newStatus = 'delivered';
+    } else {
+      return; // Already delivered or unknown
+    }
 
-      if (response.statusCode == 200) {
+    try {
+      // 1. Update Delivery Status
+      await _supabase
+          .from('deliveries')
+          .update({'status': newStatus}).eq('id', deliveryId);
+
+      // 2. If Delivered, Update Order Status (to remove from Active list)
+      if (newStatus == 'delivered') {
+        await _supabase
+            .from('orders')
+            .update({'status': 'delivered'}).eq('id', orderId);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Simulation Started! 🚀'),
+                content: Text('Delivery Completed! 🎉'),
                 backgroundColor: Colors.green),
           );
         }
       } else {
-        throw Exception('Failed to start');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Status updated: $newStatus 🚀'),
+                backgroundColor: Colors.blue),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error starting simulation: $e'),
+              content: Text('Error updating status: $e'),
               backgroundColor: Colors.red),
         );
       }
@@ -396,11 +420,27 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange,
-                                        foregroundColor: Colors.white),
-                                    icon: const Icon(LucideIcons.play),
-                                    label: const Text('Simulate'),
-                                    onPressed: () => _startSimulation(orderId),
+                                      backgroundColor:
+                                          delivery['status'] == 'in_progress'
+                                              ? Colors.green
+                                              : Colors.blue,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    icon: Icon(
+                                        delivery['status'] == 'in_progress'
+                                            ? LucideIcons.checkCheck
+                                            : LucideIcons.play),
+                                    label: Text(
+                                      delivery['status'] == 'in_progress'
+                                          ? AppTranslations.of(
+                                              context, 'finishDelivery')
+                                          : AppTranslations.of(
+                                              context, 'startDelivery'),
+                                    ),
+                                    onPressed: () => _advanceDeliveryStatus(
+                                        delivery['id'],
+                                        delivery['status'],
+                                        orderId),
                                   ),
                                 ),
                               ],
