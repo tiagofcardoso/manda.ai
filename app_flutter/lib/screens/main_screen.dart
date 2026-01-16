@@ -15,6 +15,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+  }
+
   final List<Widget> _screens = [
     const MenuScreen(),
     const OrderTrackingScreen(), // Refactored to handle null orderId internally

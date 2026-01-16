@@ -316,7 +316,17 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
 
                 // Debug Dropoff Reason
                 String dropoffAddr = 'Unknown Dropoff';
-                if (debugError != null) {
+
+                // 1. Try Snapshot (Most Reliable)
+                final snapshotAddr = data['delivery_address'];
+                if (snapshotAddr != null &&
+                    snapshotAddr.toString().isNotEmpty &&
+                    snapshotAddr != 'Table Service' &&
+                    snapshotAddr != 'Rua Exemplo 123') {
+                  dropoffAddr = snapshotAddr;
+                }
+                // 2. Fallback to Profile (Dynamic)
+                else if (debugError != null) {
                   dropoffAddr = 'Error: $debugError';
                 } else if (data['user_id'] == null) {
                   dropoffAddr = 'Unknown Client (Guest/Test Order)';

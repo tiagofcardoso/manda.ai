@@ -106,8 +106,8 @@ async def simulate_delivery():
             print(f"Update {i}/{steps}: {current_lat:.5f}, {current_lng:.5f}")
         
         # Broadcast via Channel
-        channel = supabase.channel(f'tracking:{ORDER_ID}')
-        channel.send_broadcast('location_update', {'lat': current_lat, 'lng': current_lng})
+        # channel = supabase.channel(f'tracking:{ORDER_ID}')
+        # channel.send_broadcast('location_update', {'lat': current_lat, 'lng': current_lng})
         
         # Persistence (every 10 steps)
         if i % 10 == 0:

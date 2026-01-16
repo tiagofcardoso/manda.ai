@@ -117,23 +117,30 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         )
         .subscribe();
 
-    // 2. Delivery Location Updates (Realtime Broadcast)
-    // We listen to ANY delivery update linked to this order
-    _subscription = _supabase
-        .channel('tracking:$_activeOrderId')
-        .onBroadcast(
-            event: 'location_update',
-            callback: (payload) {
-              if (payload['lat'] != null && payload['lng'] != null) {
-                if (mounted) {
-                  setState(() {
-                    _driverLocation = LatLng(payload['lat'], payload['lng']);
-                  });
-                  // Optional: Auto-center map if needed
-                  // _mapController.move(_driverLocation!, 15);
-                }
+    // 2. Delivery Location Updates (listen to DB changes)
+    _supabase
+        .channel('public:deliveries:$_activeOrderId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'deliveries',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'order_id',
+            value: _activeOrderId,
+          ),
+          callback: (payload) {
+            final newLat = payload.newRecord['current_lat'];
+            final newLng = payload.newRecord['current_lng'];
+            if (newLat != null && newLng != null) {
+              if (mounted) {
+                setState(() {
+                  _driverLocation = LatLng(newLat, newLng);
+                });
               }
-            })
+            }
+          },
+        )
         .subscribe();
 
     // Also fetch initial delivery location from DB if exists

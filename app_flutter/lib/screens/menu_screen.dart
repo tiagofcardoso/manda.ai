@@ -11,9 +11,11 @@ import 'kitchen_screen.dart';
 import '../services/theme_service.dart';
 import '../services/app_translations.dart';
 import '../services/locale_service.dart';
+import 'dart:async'; // For StreamSubscription
 import '../services/auth_service.dart';
 import 'admin/admin_login_screen.dart';
 import 'driver/driver_home_screen.dart';
+import 'client_orders_screen.dart'; // Import Client Orders
 import 'scan_screen.dart';
 import '../constants/categories.dart';
 import 'package:flutter/services.dart'; // For barcode scanner usually, but using mock for now or simple dialog logic
@@ -30,17 +32,32 @@ class _MenuScreenState extends State<MenuScreen> {
   final _cartService = CartService();
   String _selectedCategory = 'all';
   String? _userRole;
+  bool _isLoadingRole = true;
+  late final StreamSubscription<AuthState> _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _fetchUserRole();
+    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
+      _fetchUserRole();
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchUserRole() async {
     final role = await AuthService().getUserRole();
+    print('DEBUG: Fetched Role: $role');
     if (mounted) {
-      setState(() => _userRole = role);
+      setState(() {
+        _userRole = role;
+        _isLoadingRole = false;
+      });
     }
   }
 
@@ -101,25 +118,115 @@ class _MenuScreenState extends State<MenuScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Manda.AI',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold),
+                  Builder(
+                    builder: (context) {
+                      final user = _supabase.auth.currentUser;
+                      if (user == null) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Manda.AI',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                                isTableMode
+                                    ? '${AppTranslations.of(context, 'tableService')}: ${_cartService.tableId}'
+                                    : AppTranslations.of(
+                                        context, 'restaurantOS'),
+                                style: TextStyle(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 14)),
+                          ],
+                        );
+                      }
+                      // Logged In User
+                      final name = user.userMetadata?['full_name'] ??
+                          user.email ??
+                          'User';
+                      final roleDisplay = _userRole?.toUpperCase() ?? 'USER';
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            roleDisplay,
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 12,
+                                letterSpacing: 1.0,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                  Text(
-                      _userRole == 'driver'
-                          ? AppTranslations.of(context, 'driverApp')
-                          : (isTableMode
-                              ? '${AppTranslations.of(context, 'tableService')}: ${_cartService.tableId}'
-                              : AppTranslations.of(context, 'restaurantOS')),
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.8), fontSize: 14)),
                 ],
               ),
             ),
+            // Common Menu (Always Visible)
+            ListTile(
+              leading: Icon(LucideIcons.utensils,
+                  color: isDark ? Colors.white : Colors.black),
+              title: Text(AppTranslations.of(context, 'customerMenu'),
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black)),
+              onTap: () => Navigator.pop(context),
+            ),
+
+            if (!isTableMode)
+              ListTile(
+                leading: Icon(LucideIcons.qrCode,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'scanTableQR'),
+                    style:
+                        TextStyle(color: isDark ? Colors.white : Colors.black)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const ScanScreen()));
+                },
+              ),
+
+            // Client Section (Only if role is client)
+            if (_userRole == 'client') ...[
+              const Divider(),
+              ListTile(
+                leading: Icon(LucideIcons.shoppingBag,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'myOrders'),
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ClientOrdersScreen()),
+                  );
+                },
+              ),
+            ],
+
+            // Driver Section
             if (_userRole == 'driver') ...[
+              const Divider(),
               ListTile(
                 leading: Icon(LucideIcons.bike,
                     color: isDark ? Colors.white : Colors.black),
@@ -129,14 +236,53 @@ class _MenuScreenState extends State<MenuScreen> {
                         fontWeight: FontWeight.bold)),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.pushReplacement(
+                  Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (context) => const DriverHomeScreen()),
                   );
                 },
               ),
+            ],
+
+            // Admin Section
+            if (_userRole == 'admin') ...[
               const Divider(),
+              ListTile(
+                leading: Icon(LucideIcons.chefHat,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'kitchenDisplay'),
+                    style:
+                        TextStyle(color: isDark ? Colors.white : Colors.black)),
+                subtitle: const Text('Realtime Orders'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const KitchenScreen()));
+                },
+              ),
+              ListTile(
+                leading: Icon(LucideIcons.shield,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text(AppTranslations.of(context, 'managerArea'),
+                    style:
+                        TextStyle(color: isDark ? Colors.white : Colors.black)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AdminLoginScreen()));
+                },
+              ),
+            ],
+
+            const Divider(),
+
+            // Auth Actions
+            if (_supabase.auth.currentUser != null)
               ListTile(
                 leading: const Icon(LucideIcons.logOut, color: Colors.red),
                 title: Text(AppTranslations.of(context, 'logout'),
@@ -145,71 +291,10 @@ class _MenuScreenState extends State<MenuScreen> {
                 onTap: () async {
                   await AuthService().signOut();
                   Navigator.pop(context); // Close Drawer
-                  setState(() => _userRole = null); // Update UI to Client Mode
+                  setState(() => _userRole = null);
                 },
-              ),
-            ] else ...[
-              // Standard Client Menu
-              ListTile(
-                leading: Icon(LucideIcons.utensils,
-                    color: isDark ? Colors.white : Colors.black),
-                title: Text(AppTranslations.of(context, 'customerMenu'),
-                    style:
-                        TextStyle(color: isDark ? Colors.white : Colors.black)),
-                onTap: () => Navigator.pop(context),
-              ),
-              if (!isTableMode)
-                ListTile(
-                  leading: Icon(LucideIcons.qrCode,
-                      color: isDark ? Colors.white : Colors.black),
-                  title: Text(AppTranslations.of(context, 'scanTableQR'),
-                      style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const ScanScreen()));
-                  },
-                ),
-
-              if (!isTableMode) ...[
-                const Divider(),
-                ListTile(
-                  leading: Icon(LucideIcons.chefHat,
-                      color: isDark ? Colors.white : Colors.black),
-                  title: Text(AppTranslations.of(context, 'kitchenDisplay'),
-                      style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black)),
-                  subtitle: const Text('Realtime Orders'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const KitchenScreen()));
-                  },
-                ),
-              ],
-              if (!isTableMode) ...[
-                const Divider(),
-                ListTile(
-                  leading: Icon(LucideIcons.shield,
-                      color: isDark ? Colors.white : Colors.black),
-                  title: Text(AppTranslations.of(context, 'managerArea'),
-                      style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const AdminLoginScreen()));
-                  },
-                ),
-              ],
-              const Divider(),
+              )
+            else
               ListTile(
                 leading: Icon(LucideIcons.logIn,
                     color: isDark ? Colors.white : Colors.black),
@@ -224,7 +309,6 @@ class _MenuScreenState extends State<MenuScreen> {
                           builder: (context) => const AdminLoginScreen()));
                 },
               ),
-            ],
           ],
         ),
       ),
@@ -270,47 +354,6 @@ class _MenuScreenState extends State<MenuScreen> {
       body: FutureBuilder<List<Product>>(
         future: _fetchProducts(),
         builder: (context, snapshot) {
-          if (_userRole == 'driver') {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(LucideIcons.bike, size: 80, color: Colors.green),
-                  const SizedBox(height: 24),
-                  Text(
-                    AppTranslations.of(context, 'driverModeActive'),
-                    style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppTranslations.of(context, 'driverModeMessage'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 16),
-                    ),
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const DriverHomeScreen()),
-                      );
-                    },
-                    icon: const Icon(LucideIcons.layoutDashboard),
-                    label: Text(AppTranslations.of(context, 'goToDashboard')),
-                  ),
-                ],
-              ),
-            );
-          }
-
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
                 child: CircularProgressIndicator(color: Colors.white));
@@ -523,6 +566,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Widget _buildProductCard(BuildContext context, Product product) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // print('DEBUG: Building card. Role: $_userRole');
 
     return Container(
       decoration: BoxDecoration(
@@ -607,14 +651,39 @@ class _MenuScreenState extends State<MenuScreen> {
                       // Add Button
                       GestureDetector(
                         onTap: () {
-                          // Admin Restriction
-                          if (_userRole == 'admin' || _userRole == 'manager') {
+                          // 0. Loading Check
+                          if (_isLoadingRole) return;
+
+                          final currentUser = AuthService().currentUser;
+
+                          // 1. Guest Check (Not Logged In) -> Redirect to Login
+                          if (currentUser == null) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(AppTranslations.of(
+                                    context, 'loginToOrder')),
+                                backgroundColor: Colors.orange,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AdminLoginScreen()));
+                            return;
+                          }
+
+                          // 2. Staff/Restriction Check
+                          // If Logged In but NOT 'client' (e.g. Admin, Driver, or Unknown), Block.
+                          if (_userRole != 'client') {
                             ScaffoldMessenger.of(context).hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(AppTranslations.of(
                                     context, 'adminRestriction')),
-                                backgroundColor: Colors.red,
+                                backgroundColor: Colors.grey[800],
                                 behavior: SnackBarBehavior.floating,
                                 duration: const Duration(seconds: 2),
                               ),
@@ -622,6 +691,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             return;
                           }
 
+                          // 3. Client -> Add to Cart
                           _cartService.addToCart(product);
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -650,18 +720,23 @@ class _MenuScreenState extends State<MenuScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color:
-                                (_userRole == 'admin' || _userRole == 'manager')
-                                    ? Colors.grey
-                                    : const Color(0xFFE63946),
+                            color: (_userRole != null && _userRole != 'client')
+                                ? Colors.grey
+                                : const Color(0xFFE63946),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                              (_userRole == 'admin' || _userRole == 'manager')
-                                  ? LucideIcons.lock
-                                  : LucideIcons.plus,
-                              color: Colors.white,
-                              size: 20),
+                          child: _isLoadingRole
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : Icon(
+                                  (_userRole != null && _userRole != 'client')
+                                      ? LucideIcons.lock
+                                      : LucideIcons.plus,
+                                  color: Colors.white,
+                                  size: 20),
                         ),
                       ),
                     ],

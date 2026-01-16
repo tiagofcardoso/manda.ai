@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from database import supabase
-from deps import get_current_user
+from deps import get_current_user, get_current_admin, get_current_driver
 
 app = FastAPI()
 
@@ -24,6 +24,9 @@ class OrderRequest(BaseModel):
     table_id: str | None = None
     items: list
     total: float
+    user_id: str | None = None
+    delivery_address: str | None = None
+    status: str | None = None
 
 @app.post("/orders")
 def place_order(order: OrderRequest):
@@ -80,8 +83,10 @@ def place_order(order: OrderRequest):
         order_data = {
             "establishment_id": establishment_id,
             "table_id": order.table_id, # Can be None
+            "user_id": order.user_id,
             "total_amount": order.total,
-            "status": "pending"
+            "status": order.status or "pending",
+            "delivery_address": order.delivery_address
         }
         
         new_order = supabase.table("orders").insert(order_data).execute()
@@ -106,6 +111,7 @@ def place_order(order: OrderRequest):
              delivery_data = {
                  "order_id": order_id,
                  "status": "open",
+                 "address": order.delivery_address, # Pass address to delivery
                  "current_lat": 38.7223, # Shop location
                  "current_lng": -9.1393 
              }
@@ -120,7 +126,7 @@ def place_order(order: OrderRequest):
 # --- KDS ENDPOINTS ---
 
 @app.get("/kds/orders")
-def get_kds_orders(user = Depends(get_current_user)):
+def get_kds_orders(user = Depends(get_current_admin)):
     """Fetch active orders for the Kitchen Display System (pending or prep). Requires Auth."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -146,7 +152,7 @@ class StatusUpdateRequests(BaseModel):
     status: str
 
 @app.patch("/kds/orders/{order_id}")
-def update_order_status(order_id: str, request: StatusUpdateRequests, user = Depends(get_current_user)):
+def update_order_status(order_id: str, request: StatusUpdateRequests, user = Depends(get_current_admin)):
     """Update order status (e.g. pending -> prep -> ready). Requires Auth."""
     if not supabase:
          raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -173,7 +179,7 @@ class ProductRequest(BaseModel):
     is_available: bool = True
 
 @app.post("/admin/products")
-def create_product(product: ProductRequest): # Add Auth dependency later
+def create_product(product: ProductRequest, user = Depends(get_current_admin)): # Admin only
     """Create a new product. Admin only."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -196,7 +202,7 @@ def create_product(product: ProductRequest): # Add Auth dependency later
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/admin/products/{product_id}")
-def update_product(product_id: str, product: ProductRequest): # Add Auth dependency later
+def update_product(product_id: str, product: ProductRequest, user = Depends(get_current_admin)): # Admin only
     """Update an existing product. Admin only."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -212,7 +218,7 @@ def update_product(product_id: str, product: ProductRequest): # Add Auth depende
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/admin/products/{product_id}")
-def delete_product(product_id: str): # Add Auth dependency later
+def delete_product(product_id: str, user = Depends(get_current_admin)): # Admin only
     """Delete a product. Admin only."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -226,7 +232,7 @@ def delete_product(product_id: str): # Add Auth dependency later
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/stats/sales")
-def get_sales_stats(period: str = 'daily'):
+def get_sales_stats(period: str = 'daily', user = Depends(get_current_admin)):
     """Fetch sales stats aggregated by period (daily, weekly, monthly)."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -298,7 +304,7 @@ def get_sales_stats(period: str = 'daily'):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/stats/top_products")
-def get_top_products(limit: int = 5):
+def get_top_products(limit: int = 5, user = Depends(get_current_admin)):
     """Fetch top selling products based on order_items."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -340,7 +346,7 @@ class DeliveryRequest(BaseModel):
     driver_id: str | None = None
 
 @app.post("/admin/deliveries/assign")
-def assign_delivery(req: DeliveryRequest):
+def assign_delivery(req: DeliveryRequest, user = Depends(get_current_admin)):
     """Create a delivery. If driver_id/name is missing, it's an OPEN request (Pool)."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -370,7 +376,7 @@ def assign_delivery(req: DeliveryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/driver/deliveries/{delivery_id}/accept")
-def accept_delivery(delivery_id: str, user = Depends(get_current_user)):
+def accept_delivery(delivery_id: str, user = Depends(get_current_driver)):
     """Driver accepts an open delivery."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")

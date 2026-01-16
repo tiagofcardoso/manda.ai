@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart'; // Needed for kIsWeb
+import 'package:supabase_flutter/supabase_flutter.dart'; // Added Supabase import
 
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
@@ -172,24 +173,61 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
 
     try {
       final tableId = widget.cartService.tableId;
+      final user = AuthService().currentUser;
 
-      // If no table, assume Delivery/Takeaway (Must be logged in or prompt address)
-      String? address;
+      // 1. Enforce Auth for Delivery
+      if (tableId == null && user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppTranslations.of(context, 'loginRequired')),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: 'LOGIN',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2. Determine Address (Snapshot)
+      String deliveryAddress = 'Table Service';
       if (tableId == null) {
-        // Simple prompt for now, or use saved address
-        final controller = TextEditingController();
-        // TODO: Improve this UX with a better address picker
-        // Ideally, show a dialog if address is not set
-        // For now, let's hardcode or ask user
+        // Fetch recent profile data to get address
+        try {
+          final profile = await Supabase.instance.client
+              .from('profiles')
+              .select('street, city, zip_code')
+              .eq('id', user!.id)
+              .single();
+
+          final street = profile['street'] ?? '';
+          final city = profile['city'] ?? '';
+
+          if (street.toString().trim().isEmpty) {
+            throw Exception(
+                'Please update your address in Profile before ordering.');
+          }
+
+          deliveryAddress = '$street, $city';
+        } catch (e) {
+          if (e.toString().contains('Please update')) rethrow;
+          deliveryAddress = 'Address not found';
+        }
       }
 
       final payload = {
-        "user_id": AuthService().currentUser?.id,
+        "user_id": user?.id,
         "table_id": tableId
             ?.toString(), // Can be null for delivery, converted to String if present
         "total": widget.cartService.totalAmount,
         "status": "pending",
-        "delivery_address": "Rua Exemplo 123", // Mock for now if delivery
+        "delivery_address": deliveryAddress,
         "items": widget.cartService.items
             .map((item) => {
                   "product_id": item.product.id,
