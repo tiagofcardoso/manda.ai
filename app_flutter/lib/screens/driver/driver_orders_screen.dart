@@ -300,24 +300,30 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
             const SizedBox(height: 8),
             const SizedBox(height: 8),
 
-            // Real Address Info via FutureBuilder
+            // Real Address & Status Info
             FutureBuilder<Map<String, dynamic>?>(
               future: _fetchOrderDetails(orderId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Text('Loading addresses...',
-                      style: TextStyle(color: Colors.grey, fontSize: 12));
+                  return const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('Loading details...',
+                        style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  );
                 }
 
                 final data = snapshot.data ?? {};
                 final est = data['establishments'];
                 final profile = data['profiles'];
-                final debugError = data['debug_error'];
+                final orderStatus = data['status'] ?? 'pending'; // Order Status
+
+                // Block 'Accept' until Kitchen marks as READY (user request)
+                final canAccept =
+                    orderStatus.toString().toLowerCase() == 'ready';
 
                 // Debug Dropoff Reason
                 String dropoffAddr = 'Unknown Dropoff';
-
-                // 1. Try Snapshot (Most Reliable)
+                // ... (existing address logic) ...
                 final snapshotAddr = data['delivery_address'];
                 if (snapshotAddr != null &&
                     snapshotAddr.toString().isNotEmpty &&
@@ -325,107 +331,110 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                     snapshotAddr != 'Rua Exemplo 123') {
                   dropoffAddr = snapshotAddr;
                 }
-                // 2. Fallback to Profile (Dynamic)
-                else if (debugError != null) {
-                  dropoffAddr = 'Error: $debugError';
-                } else if (data['user_id'] == null) {
-                  dropoffAddr = 'Unknown Client (Guest/Test Order)';
-                } else if (profile == null) {
-                  dropoffAddr = 'Profile Not Found (ID: ${data['user_id']})';
-                } else {
+                // ... (rest of address logic maintained internally if not replaced, but here I am replacing the block) ...
+                else if (data['user_id'] == null) {
+                  dropoffAddr = 'Unknown Client (Guest)';
+                } else if (profile != null) {
                   final street = profile['street'];
                   final city = profile['city'];
-                  if (street == null || (street as String).isEmpty) {
-                    dropoffAddr = '${profile['full_name']} (Address Empty)';
-                  } else {
-                    dropoffAddr = '${profile['full_name']} - $street $city';
-                  }
+                  if (street != null) dropoffAddr = '$street, $city';
                 }
 
                 final pickupAddr = est != null
-                    ? '${est['name']} - ${est['street'] ?? 'No Street'} ${est['city'] ?? ''}'
-                    : 'Unknown Pickup (Est ID: ${data['establishment_id']})';
+                    ? '${est['name']} - ${est['city'] ?? ''}'
+                    : 'Unknown Pickup';
 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Pickup
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(LucideIcons.store,
-                            size: 16, color: Colors.blueGrey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text('Pickup: $pickupAddr',
-                              style: const TextStyle(
-                                  color: Colors.blueGrey, fontSize: 12)),
-                        ),
-                      ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            const Icon(LucideIcons.store,
+                                size: 16, color: Colors.blueGrey),
+                            const SizedBox(width: 4),
+                            Expanded(
+                                child: Text('Pickup: $pickupAddr',
+                                    style: const TextStyle(fontSize: 12)))
+                          ]),
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            const Icon(LucideIcons.mapPin,
+                                size: 16, color: Colors.orange),
+                            const SizedBox(width: 4),
+                            Expanded(
+                                child: Text('Drop-off: $dropoffAddr',
+                                    style: const TextStyle(fontSize: 12)))
+                          ]),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    // Dropoff
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(LucideIcons.mapPin,
-                            size: 16, color: Colors.orange),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text('Drop-off: $dropoffAddr',
-                              style: const TextStyle(
-                                  color: Colors.blueGrey, fontSize: 12)),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 16),
+                    // Action Buttons
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: isMyDelivery
+                          ? Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(LucideIcons.map),
+                                    label: const Text('Map'),
+                                    onPressed: () {
+                                      Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (_) =>
+                                                  OrderTrackingScreen(
+                                                      orderId: orderId)));
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange,
+                                        foregroundColor: Colors.white),
+                                    icon: const Icon(LucideIcons.play),
+                                    label: const Text('Simulate'),
+                                    onPressed: () => _startSimulation(orderId),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : SizedBox(
+                              width: double.infinity,
+                              child: canAccept
+                                  ? ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12)),
+                                      icon: const Icon(LucideIcons.check),
+                                      label: const Text('ACCEPT DELIVERY'),
+                                      onPressed: () =>
+                                          _acceptDelivery(delivery['id']),
+                                    )
+                                  : ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.grey,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12)),
+                                      icon: const Icon(LucideIcons.clock),
+                                      label: const Text('WAITING FOR READY'),
+                                      onPressed: null, // Disabled
+                                    ),
+                            ),
+                    )
                   ],
                 );
               },
             ),
-
-            const SizedBox(height: 16),
-            if (isMyDelivery)
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(LucideIcons.map),
-                      label: const Text('Map'),
-                      onPressed: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    OrderTrackingScreen(orderId: orderId)));
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white),
-                      icon: const Icon(LucideIcons.play),
-                      label: const Text('Simulate'),
-                      onPressed: () => _startSimulation(orderId),
-                    ),
-                  ),
-                ],
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12)),
-                  icon: const Icon(LucideIcons.check),
-                  label: const Text('ACCEPT DELIVERY'),
-                  onPressed: () => _acceptDelivery(delivery['id']),
-                ),
-              )
           ],
         ),
       ),

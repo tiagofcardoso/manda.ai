@@ -34,7 +34,7 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
       final response = await _supabase
           .from('orders')
           .select()
-          .eq('profile_id', user.id)
+          .eq('user_id', user.id) // Correct column is user_id
           .order('created_at', ascending: false);
 
       if (mounted) {

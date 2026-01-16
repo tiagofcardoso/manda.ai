@@ -395,7 +395,7 @@ class _OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${AppTranslations.of(context, 'orders')} #${order['id'].toString().substring(0, 6)}',
+                  '${AppTranslations.of(context, 'orders')} #${order['id'].toString().substring(0, 8)}',
                   style: TextStyle(
                       color: textColor,
                       fontWeight: FontWeight.bold,

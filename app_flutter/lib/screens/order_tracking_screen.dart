@@ -13,6 +13,8 @@ import '../services/app_translations.dart';
 import '../utils/image_helper.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart'; // Added for GPS
+import 'dart:async';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String? orderId;
@@ -29,6 +31,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   RealtimeChannel? _subscription;
   final SupabaseClient _supabase = Supabase.instance.client;
   Stream<Map<String, dynamic>>? _orderStream;
+  StreamSubscription<Position>?
+      _positionStreamSubscription; // For broadcasting location
 
   // Map Variables
   final MapController _mapController = MapController();
@@ -36,7 +40,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   LatLng?
       _destinationLocation; // Mock for now, or fetch from order if address exists
   // Mock Shop Location (e.g., Lisbon Center)
-  final LatLng _shopLocation = const LatLng(38.7223, -9.1393);
+  LatLng _shopLocation =
+      const LatLng(38.7223, -9.1393); // Default Lisbon Center
   bool _isMapReady = false;
 
   @override
@@ -56,14 +61,25 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     // We will check role asynchronously in _checkAccess()
     _checkAccessAndLoad();
+
+    // Listen to global order changes (if a new order is placed from Cart)
+    OrderService().currentOrderIdNotifier.addListener(_onOrderServiceChange);
   }
 
   Future<void> _checkAccessAndLoad() async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      // Guest - Do not load cached order
       if (mounted) setState(() => _activeOrderId = null);
       return;
+    }
+
+    // If no ID passed, try to restore active session from DB
+    if (_activeOrderId == null) {
+      await _restoreActiveSession(user.id);
+    }
+
+    if (_activeOrderId == null) {
+      return; // Still no order
     }
 
     // Check Role
@@ -81,12 +97,46 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       if (mounted) setState(() => _activeOrderId = orderId);
       _fetchInitialStatus();
       _subscribeToOrderUpdates();
-      // Fetch Dropoff Location for Map
-      _fetchDropoffLocation();
-    }
 
-    // Listen to global order changes (if a new order is placed from Cart)
-    OrderService().currentOrderIdNotifier.addListener(_onOrderServiceChange);
+      // Fetch Locations for Map
+      _fetchShopLocation(); // [NEW] Fetch dynamic shop loc
+      _fetchDropoffLocation();
+
+      // If Driver, START BROADCASTING LOCATION
+      if (role == 'driver') {
+        _startLocationBroadcasting();
+      }
+    }
+  }
+
+  Future<void> _restoreActiveSession(String userId) async {
+    try {
+      // Find latest order that is NOT completed/cancelled
+      final response = await _supabase
+          .from('orders')
+          .select('id')
+          .eq('user_id', userId)
+          .neq('status', 'delivered')
+          .neq('status', 'cancelled')
+          .neq('status', 'completed')
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response != null && mounted) {
+        setState(() {
+          _activeOrderId = response['id'];
+        });
+
+        // Load Details for this restored order
+        _fetchInitialStatus();
+        _subscribeToOrderUpdates();
+        _fetchShopLocation();
+        _fetchDropoffLocation();
+      }
+    } catch (e) {
+      debugPrint('Error restoring session: $e');
+    }
   }
 
   Future<void> _fetchDropoffLocation() async {
@@ -149,6 +199,110 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
   }
 
+  Future<void> _fetchShopLocation() async {
+    if (_activeOrderId == null) return;
+    try {
+      // 1. Get Establishment ID from Order
+      final order = await _supabase
+          .from('orders')
+          .select('establishment_id')
+          .eq('id', _activeOrderId!)
+          .single();
+
+      final estId = order['establishment_id'];
+      if (estId == null) return;
+
+      // 2. Fetch Establishment Address
+      final est = await _supabase
+          .from('establishments')
+          .select('street, city, country') // Removed postcode
+          .eq('id', estId)
+          .single();
+
+      final street = est['street'];
+      final city = est['city'];
+
+      if (street != null && city != null) {
+        // 3. Geocode
+        final addressQuery =
+            '$street, $city, Portugal'; // Assume Portugal for now
+        final url = Uri.parse(
+            'https://nominatim.openstreetmap.org/search?q=$addressQuery&format=json&limit=1');
+        final response = await http
+            .get(url, headers: {'User-Agent': 'Manda.AI_DriverApp/1.0'});
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data is List && data.isNotEmpty) {
+            final lat = double.parse(data[0]['lat']);
+            final lon = double.parse(data[0]['lon']);
+            if (mounted) {
+              setState(() {
+                _shopLocation = LatLng(lat, lon);
+              });
+              // Auto-fit will be called by other location updates or map ready
+              _fitMapBounds();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching shop location: $e');
+    }
+  }
+
+  // === DRIVER: GPS BROADCASTING ===
+  Future<void> _startLocationBroadcasting() async {
+    // 1. Check Permissions
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      debugPrint('Location services are disabled.');
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        debugPrint('Location permissions are denied');
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      debugPrint(
+          'Location permissions are permanently denied, we cannot request permissions.');
+      return;
+    }
+
+    // 2. Start Stream
+    final locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10, // Update every 10 meters
+    );
+
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings)
+            .listen((Position position) {
+      _updateDriverLocationInDB(position.latitude, position.longitude);
+    });
+  }
+
+  Future<void> _updateDriverLocationInDB(double lat, double lng) async {
+    if (_activeOrderId == null) return;
+    try {
+      await _supabase.from('deliveries').update({
+        'current_lat': lat,
+        'current_lng': lng,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('order_id', _activeOrderId!);
+
+      // Optimistic update locally? No, we listen to the stream anyway.
+    } catch (e) {
+      debugPrint('Error broadcasting location: $e');
+    }
+  }
+
   void _fitMapBounds() {
     if (!_isMapReady) return;
 
@@ -189,6 +343,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   void dispose() {
+    _positionStreamSubscription?.cancel();
     OrderService().currentOrderIdNotifier.removeListener(_onOrderServiceChange);
     _subscription?.unsubscribe();
     super.dispose();
