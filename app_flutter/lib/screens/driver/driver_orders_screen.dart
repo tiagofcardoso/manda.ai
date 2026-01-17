@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../order_tracking_screen.dart';
+import 'package:url_launcher/url_launcher.dart'; // [NEW] Linker
 import '../../constants/api.dart';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/app_drawer.dart'; // [NEW]
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -82,7 +83,36 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
     super.dispose();
   }
 
-  // Methods restored for Actions
+  // --- ACTIONS ---
+
+  Future<void> _openMap(String address) async {
+    // Encode the address for the query
+    final query = Uri.encodeComponent(address);
+    final googleMapsUrl =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    final wazeUrl = Uri.parse('https://waze.com/ul?q=$query');
+
+    try {
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(wazeUrl)) {
+        await launchUrl(wazeUrl, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback: Try launching as a plain web URL (without checking specifically for app handler)
+        // sometimes canLaunchUrl checks for specific app handler but launchUrl works for browser
+        if (!await launchUrl(googleMapsUrl,
+            mode: LaunchMode.externalApplication)) {
+          throw 'Could not launch Maps';
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening map: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _acceptDelivery(String deliveryId) async {
     try {
@@ -254,14 +284,20 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
 
   Future<Map<String, dynamic>?> _fetchOrderDetails(String orderId) async {
     try {
-      // 1. Fetch Order
-      final order =
-          await _supabase.from('orders').select().eq('id', orderId).single();
+      // [UPDATED] 1. Fetch Order + Items
+      // We use Supabase efficient joining
+      // Note: adjust syntax if "products" are not directly related to order_items in your Supabase setup
+      // (but assuming they are based on main.py)
+      final order = await _supabase
+          .from('orders')
+          .select('*, order_items(*, products(name))')
+          .eq('id', orderId)
+          .single();
 
       Map<String, dynamic>? profile;
       Map<String, dynamic>? establishment;
 
-      // 2. Fetch Profile (Client)
+      // 2. Fetch Profile (Client) if needed
       if (order['user_id'] != null) {
         try {
           profile = await _supabase
@@ -303,8 +339,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(), // [NEW] Side Menu
       appBar: AppBar(
         title: const Text('Driver Dashboard'),
+        // automaticallyImplyLeading removed to allow Drawer icon
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         bottom: TabBar(
@@ -405,222 +443,273 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      elevation: 4,
+      child: FutureBuilder<Map<String, dynamic>?>(
+        future: _fetchOrderDetails(orderId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final data = snapshot.data ?? {};
+          final est = data['establishments'];
+          final profile = data['profiles'];
+          final orderStatus = data['status'] ?? 'pending'; // Order Status
+          final orderItems = data['order_items'] as List<dynamic>? ?? [];
+
+          // Block 'Accept' until Kitchen marks as READY (user request)
+          final canAccept = orderStatus.toString().toLowerCase() == 'ready';
+
+          // Debug Dropoff Reason
+          String dropoffAddr = 'Unknown Dropoff';
+          // ... (existing address logic) ...
+          final snapshotAddr = data['delivery_address'];
+          if (snapshotAddr != null &&
+              snapshotAddr.toString().isNotEmpty &&
+              snapshotAddr != 'Table Service' &&
+              snapshotAddr != 'Rua Exemplo 123') {
+            dropoffAddr = snapshotAddr;
+          } else if (data['user_id'] == null) {
+            dropoffAddr = 'Unknown Client (Guest)';
+          } else if (profile != null) {
+            final street = profile['street'];
+            final city = profile['city'];
+            if (street != null) dropoffAddr = '$street, $city';
+          }
+
+          // Fallback if we still don't have address but delivery table has it
+          if (dropoffAddr == 'Unknown Dropoff' && delivery['address'] != null) {
+            dropoffAddr = delivery['address'];
+          }
+
+          final pickupAddr = est != null
+              ? '${est['name']} - ${est['city'] ?? ''}'
+              : 'Unknown Pickup';
+
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Order #${orderId.toString().substring(0, 8)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                      color:
-                          isMyDelivery ? Colors.blue[100] : Colors.green[100],
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Text(status.toUpperCase(),
-                      style: TextStyle(
-                          color: isMyDelivery
-                              ? Colors.blue[800]
-                              : Colors.green[800],
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
-            const SizedBox(height: 8),
-            const SizedBox(height: 8),
-
-            // Real Address & Status Info
-            FutureBuilder<Map<String, dynamic>?>(
-              future: _fetchOrderDetails(orderId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text('Loading details...',
-                        style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  );
-                }
-
-                final data = snapshot.data ?? {};
-                final est = data['establishments'];
-                final profile = data['profiles'];
-                final orderStatus = data['status'] ?? 'pending'; // Order Status
-
-                // Block 'Accept' until Kitchen marks as READY (user request)
-                final canAccept =
-                    orderStatus.toString().toLowerCase() == 'ready';
-
-                // Debug Dropoff Reason
-                String dropoffAddr = 'Unknown Dropoff';
-                // ... (existing address logic) ...
-                final snapshotAddr = data['delivery_address'];
-                if (snapshotAddr != null &&
-                    snapshotAddr.toString().isNotEmpty &&
-                    snapshotAddr != 'Table Service' &&
-                    snapshotAddr != 'Rua Exemplo 123') {
-                  dropoffAddr = snapshotAddr;
-                }
-                // ... (rest of address logic maintained internally if not replaced, but here I am replacing the block) ...
-                else if (data['user_id'] == null) {
-                  dropoffAddr = 'Unknown Client (Guest)';
-                } else if (profile != null) {
-                  final street = profile['street'];
-                  final city = profile['city'];
-                  if (street != null) dropoffAddr = '$street, $city';
-                }
-
-                final pickupAddr = est != null
-                    ? '${est['name']} - ${est['city'] ?? ''}'
-                    : 'Unknown Pickup';
-
-                return Column(
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            const Icon(LucideIcons.store,
-                                size: 16, color: Colors.blueGrey),
-                            const SizedBox(width: 4),
-                            Expanded(
-                                child: Text('Pickup: $pickupAddr',
-                                    style: const TextStyle(fontSize: 12)))
-                          ]),
-                          const SizedBox(height: 4),
-                          Row(children: [
-                            const Icon(LucideIcons.mapPin,
-                                size: 16, color: Colors.orange),
-                            const SizedBox(width: 4),
-                            Expanded(
-                                child: Text('Drop-off: $dropoffAddr',
-                                    style: const TextStyle(fontSize: 12)))
-                          ]),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Action Buttons
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: isMyDelivery
-                          ? (delivery['status'] == 'delivered'
-                              ? const SizedBox
-                                  .shrink() // Hide ALL buttons if delivered
-                              : Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(LucideIcons.map),
-                                        label: const Text('Map'),
-                                        onPressed: () {
-                                          Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      OrderTrackingScreen(
-                                                          orderId: orderId)));
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: delivery['status'] ==
-                                                  'in_progress'
-                                              ? Colors.green
-                                              : Colors.blue,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        icon: Icon(
-                                            delivery['status'] == 'in_progress'
-                                                ? LucideIcons.checkCheck
-                                                : LucideIcons.play),
-                                        label: Text(
-                                          delivery['status'] == 'in_progress'
-                                              ? AppTranslations.of(
-                                                  context, 'finishDelivery')
-                                              : AppTranslations.of(
-                                                  context, 'startDelivery'),
-                                        ),
-                                        onPressed: () => _advanceDeliveryStatus(
-                                            delivery['id'],
-                                            delivery['status'],
-                                            orderId),
-                                      ),
-                                    ),
-                                  ],
-                                ))
-                          : Column(
-                              children: [
-                                if (_roleLoading)
-                                  const SizedBox(
-                                      height: 48,
-                                      child: Center(
-                                          child: CircularProgressIndicator()))
-                                else if (_userRole == 'admin' ||
-                                    _userRole == 'manager')
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.purple,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12),
-                                        minimumSize:
-                                            const Size(double.infinity, 48)),
-                                    icon: const Icon(LucideIcons.clipboardList),
-                                    label: const Text('ASSIGN DRIVER'),
-                                    onPressed: () =>
-                                        _showAssignmentDialog(delivery['id']),
-                                  )
-                                else
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: canAccept
-                                        ? ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.green,
-                                                foregroundColor: Colors.white,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 12)),
-                                            icon: const Icon(LucideIcons.check),
-                                            label:
-                                                const Text('ACCEPT DELIVERY'),
-                                            onPressed: () =>
-                                                _acceptDelivery(delivery['id']),
-                                          )
-                                        : ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.grey,
-                                                foregroundColor: Colors.white,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 12)),
-                                            icon: const Icon(LucideIcons.clock),
-                                            label:
-                                                const Text('WAITING FOR READY'),
-                                            onPressed: null, // Disabled
-                                          ),
-                                  ),
-                              ],
-                            ),
+                    Text('Order #${orderId.toString().substring(0, 8)}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: isMyDelivery
+                              ? Colors.blue[100]
+                              : Colors.green[100],
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(status.toUpperCase(),
+                          style: TextStyle(
+                              color: isMyDelivery
+                                  ? Colors.blue[800]
+                                  : Colors.green[800],
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
                     )
                   ],
-                );
-              },
+                ),
+                const Divider(),
+
+                // [NEW] ITEMS LIST
+                if (orderItems.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Text('${orderItems.length} Items',
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 12)),
+                      ),
+                      ...orderItems.map((item) {
+                        final productName =
+                            item['products']?['name'] ?? 'Unknown Item';
+                        final qty = item['quantity'] ?? 1;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4.0),
+                          child: Row(
+                            children: [
+                              Text('${qty}x ',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green)),
+                              Expanded(child: Text(productName)),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      const Divider(),
+                    ],
+                  ),
+
+                // Addresses
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(LucideIcons.store,
+                      size: 20, color: Colors.blueGrey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Pickup",
+                          style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      Text(pickupAddr, style: const TextStyle(fontSize: 14)),
+                    ],
+                  ))
+                ]),
+                const SizedBox(height: 12),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(LucideIcons.mapPin,
+                      size: 20, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Drop-off",
+                          style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      Text(dropoffAddr,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  ))
+                ]),
+
+                const SizedBox(height: 16),
+
+                // [NEW] External Map Button
+                if (status == 'in_progress' || status == 'assigned')
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(LucideIcons.navigation, size: 18),
+                      label: const Text('Open in Maps'),
+                      onPressed: () => _openMap(dropoffAddr),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.blue[800],
+                          side: BorderSide(color: Colors.blue[200]!)),
+                    ),
+                  ),
+
+                // Action Buttons
+                isMyDelivery
+                    ? (delivery['status'] == 'delivered'
+                        ? const Center(
+                            child: Text("Delivered",
+                                style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold)))
+                        : Row(
+                            children: [
+                              // Expanded(
+                              //   child: OutlinedButton.icon(
+                              //     icon: const Icon(LucideIcons.map),
+                              //     label: const Text('Internal Map'),
+                              //     onPressed: () {
+                              //       Navigator.push(
+                              //           context,
+                              //           MaterialPageRoute(
+                              //               builder: (_) =>
+                              //                   OrderTrackingScreen(
+                              //                       orderId: orderId)));
+                              //     },
+                              //   ),
+                              // ),
+                              // const SizedBox(width: 8),
+                              // Removed Internal Map for now to declutter, using external
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          delivery['status'] == 'in_progress'
+                                              ? Colors.green
+                                              : Colors.blue,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12)),
+                                  icon: Icon(delivery['status'] == 'in_progress'
+                                      ? LucideIcons.checkCheck
+                                      : LucideIcons.play),
+                                  label: Text(
+                                    delivery['status'] == 'in_progress'
+                                        ? AppTranslations.of(
+                                            context, 'finishDelivery')
+                                        : AppTranslations.of(
+                                            context, 'startDelivery'),
+                                  ),
+                                  onPressed: () => _advanceDeliveryStatus(
+                                      delivery['id'],
+                                      delivery['status'],
+                                      orderId),
+                                ),
+                              ),
+                            ],
+                          ))
+                    : Column(
+                        children: [
+                          if (_roleLoading)
+                            const SizedBox(
+                                height: 48,
+                                child:
+                                    Center(child: CircularProgressIndicator()))
+                          else if (_userRole == 'admin' ||
+                              _userRole == 'manager')
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  minimumSize: const Size(double.infinity, 48)),
+                              icon: const Icon(LucideIcons.clipboardList),
+                              label: const Text('ASSIGN DRIVER'),
+                              onPressed: () =>
+                                  _showAssignmentDialog(delivery['id']),
+                            )
+                          else
+                            SizedBox(
+                              width: double.infinity,
+                              child: canAccept
+                                  ? ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12)),
+                                      icon: const Icon(LucideIcons.check),
+                                      label: const Text('ACCEPT DELIVERY'),
+                                      onPressed: () =>
+                                          _acceptDelivery(delivery['id']),
+                                    )
+                                  : ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.grey,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12)),
+                                      icon: const Icon(LucideIcons.clock),
+                                      label: const Text('WAITING FOR READY'),
+                                      onPressed: null, // Disabled
+                                    ),
+                            ),
+                        ],
+                      ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

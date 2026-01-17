@@ -131,6 +131,25 @@ class AppTranslations {
       'startDelivery': 'Start Delivery',
       'finishDelivery': 'Done',
       'tableOrder': 'Table Order',
+      // Vehicle Types
+      'vehicleType': 'Vehicle Type',
+      'moto': 'Motorcycle',
+      'scooter': 'Scooter',
+      'bike': 'Bicycle',
+      'car': 'Car',
+      'kickScooter': 'Kick Scooter',
+      'skates': 'Roller Skates',
+      'otherVehicle': 'Other',
+    },
+    'pt': {
+      'appTitle': 'Manda.AI',
+      'welcome': 'Bem-vindo',
+      'scanTable': 'Escanear QR Code',
+// ... (omitting unchanged lines for brevity if possible, but replace_file_content needs contigous block)
+// Actually I will just target the end of the 'en' block and insert there, then target end of 'pt' block.
+// Better to do one replace if possible or split. The file is small enough to do a larger replace or 2 separate ones.
+// I'll do two separate replacements to be safe.
+// WAIT: replace_file_content allows replacing a block. I can replacing the end of 'en' map.
     },
     'pt': {
       'appTitle': 'Manda.AI',
@@ -259,6 +278,15 @@ class AppTranslations {
       'startDelivery': 'Iniciar Entrega',
       'finishDelivery': 'Entregue',
       'tableOrder': 'Mesa',
+      // Vehicle Types
+      'vehicleType': 'Tipo de Veículo',
+      'moto': 'Moto',
+      'scooter': 'Scooter',
+      'bike': 'Bicicleta',
+      'car': 'Carro',
+      'kickScooter': 'Patinete',
+      'skates': 'Patins',
+      'otherVehicle': 'Outro',
     },
   };
 

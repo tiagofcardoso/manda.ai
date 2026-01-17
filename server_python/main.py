@@ -362,6 +362,147 @@ def get_top_products(limit: int = 5, user = Depends(get_current_admin)):
         print(f"Error fetching top products: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- ADMIN ORDER MANAGEMENT ENDPOINTS ---
+
+@app.get("/admin/orders")
+def get_admin_orders(
+    status: str | None = None,
+    order_type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 100,
+    user = Depends(get_current_admin)
+):
+    """Fetch all orders with filters. Admin only."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    try:
+        # Build query with joins for related data
+        # Note: Removed profiles join because many orders don't have user_id (guest/table orders)
+        query = supabase.table('orders').select(
+            '*, order_items(*, products(name, price, image_url)), tables(table_number)'
+        )
+        
+        # Apply filters
+        if status:
+            query = query.eq('status', status)
+        if order_type:
+            query = query.eq('order_type', order_type)
+        if date_from:
+            query = query.gte('created_at', date_from)
+        if date_to:
+            query = query.lte('created_at', date_to)
+        
+        # Order by most recent first
+        query = query.order('created_at', desc=True).limit(limit)
+        response = query.execute()
+        
+        # Optionally fetch user info separately for orders that have user_id
+        orders = response.data
+        for order in orders:
+            if order.get('user_id'):
+                try:
+                    profile = supabase.table('profiles').select('full_name, email').eq('id', order['user_id']).single().execute()
+                    order['profiles'] = profile.data if profile.data else None
+                except:
+                    order['profiles'] = None
+            else:
+                order['profiles'] = None
+        
+        return orders
+    except Exception as e:
+        print(f"Error fetching admin orders: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/orders/{order_id}")
+def get_admin_order_detail(order_id: str, user = Depends(get_current_admin)):
+    """Get detailed information about a specific order. Admin only."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    try:
+        response = supabase.table('orders').select(
+            '*, order_items(*, products(name, price, image_url)), tables(table_number), deliveries(*)'
+        ).eq('id', order_id).single().execute()
+        
+        order = response.data
+        
+        # Fetch profile separately if user_id exists
+        if order.get('user_id'):
+            try:
+                profile = supabase.table('profiles').select('full_name, email, phone_number').eq('id', order['user_id']).single().execute()
+                order['profiles'] = profile.data if profile.data else None
+            except:
+                order['profiles'] = None
+        else:
+            order['profiles'] = None
+        
+        return order
+    except Exception as e:
+        print(f"Error fetching order detail: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=404, detail="Order not found")
+
+@app.get("/admin/stats/today")
+def get_today_stats(user = Depends(get_current_admin)):
+    """Get quick stats for today only."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    try:
+        now = datetime.now()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Fetch today's orders
+        response = supabase.table('orders').select('status, total_amount').gte('created_at', start_of_day.isoformat()).execute()
+        
+        orders = response.data
+        total_orders = len(orders)
+        total_revenue = sum(order['total_amount'] for order in orders)
+        
+        # Count by status
+        active_orders = len([o for o in orders if o['status'] in ['pending', 'prep', 'ready', 'on_way']])
+        completed_orders = len([o for o in orders if o['status'] in ['delivered', 'completed']])
+        
+        avg_order_value = total_revenue / total_orders if total_orders > 0 else 0.0
+        
+        return {
+            "total_orders": total_orders,
+            "total_revenue": round(total_revenue, 2),
+            "active_orders": active_orders,
+            "completed_orders": completed_orders,
+            "avg_order_value": round(avg_order_value, 2)
+        }
+    except Exception as e:
+        print(f"Error fetching today stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/stats/orders-by-status")
+def get_orders_by_status(user = Depends(get_current_admin)):
+    """Get count of orders by status."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    try:
+        # Fetch all orders (or recent ones)
+        response = supabase.table('orders').select('status').execute()
+        
+        orders = response.data
+        status_counts = {}
+        
+        for order in orders:
+            status = order['status']
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        return status_counts
+    except Exception as e:
+        print(f"Error fetching orders by status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- DELIVERY ENDPOINTS ---
 
 class DeliveryRequest(BaseModel):

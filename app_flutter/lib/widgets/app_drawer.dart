@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/app_translations.dart';
 import '../screens/main_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
+import '../screens/admin/admin_orders_screen.dart';
 import '../screens/kitchen_screen.dart';
 import '../screens/driver/driver_home_screen.dart';
 import '../screens/scan_screen.dart';
@@ -119,7 +120,7 @@ class _AppDrawerState extends State<AppDrawer> {
                           onTap: () => _navigateTo(const KitchenScreen()),
                         ),
 
-                      // Admin
+                      // Admin Dashboard
                       if (_role == 'admin' || _role == 'manager')
                         ListTile(
                           leading: const Icon(LucideIcons.layoutDashboard),
@@ -127,6 +128,14 @@ class _AppDrawerState extends State<AppDrawer> {
                               AppTranslations.of(context, 'adminDashboard')),
                           onTap: () =>
                               _navigateTo(const AdminDashboardScreen()),
+                        ),
+
+                      // Admin Orders
+                      if (_role == 'admin' || _role == 'manager')
+                        ListTile(
+                          leading: const Icon(LucideIcons.receipt),
+                          title: Text(AppTranslations.of(context, 'orders')),
+                          onTap: () => _navigateTo(const AdminOrdersScreen()),
                         ),
 
                       const Divider(),

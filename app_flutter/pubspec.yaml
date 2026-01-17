@@ -52,6 +52,7 @@ dependencies:
   permission_handler: ^11.3.1
   flutter_map_cancellable_tile_provider: ^3.0.2
   shared_preferences: ^2.3.3
+  url_launcher: ^6.3.1
 
 
 # ...

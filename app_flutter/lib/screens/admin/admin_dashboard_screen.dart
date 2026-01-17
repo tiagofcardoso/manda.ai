@@ -6,6 +6,7 @@ import 'admin_products_screen.dart';
 import 'admin_sales_screen.dart';
 
 import '../../widgets/app_drawer.dart';
+import 'admin_orders_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -131,6 +132,16 @@ class AdminDashboardScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                               builder: (context) => const AdminSalesScreen())),
+                    ),
+                    _buildActionCard(
+                      context,
+                      AppTranslations.of(context, 'orders'),
+                      'assets/images/icon_sales_3d.png',
+                      Colors.blue,
+                      () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const AdminOrdersScreen())),
                     ),
                     _buildActionCard(
                       context,
