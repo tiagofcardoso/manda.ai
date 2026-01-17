@@ -53,6 +53,8 @@ dependencies:
   flutter_map_cancellable_tile_provider: ^3.0.2
   shared_preferences: ^2.3.3
   url_launcher: ^6.3.1
+  geocoding: ^4.0.0
+  audioplayers: ^6.4.0
 
 
 # ...
@@ -99,6 +101,7 @@ flutter:
   assets:
     - lib/.env
     - assets/images/
+    - assets/sounds/
     #- images/
 
 

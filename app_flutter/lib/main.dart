@@ -15,12 +15,6 @@ Future<void> main() async {
   // NOTE: Hardcoding credentials to bypass Flutter Web 'assets/.env' 500 error.
   // We can switch back to dotenv for mobile builds later.
 
-  // try {
-  //   await dotenv.load(fileName: ".env");
-  // } catch (e) {
-  //   debugPrint("Warning: Failed to load .env file: $e");
-  // }
-
   const supabaseUrl = 'https://jpysitnnnopomrgjbaxq.supabase.co';
   const supabaseKey = 'sb_publishable_2ydfHF0FqCYOr5ZQ5NZ4QQ_UUDvboCo';
 
@@ -38,6 +32,9 @@ Future<void> main() async {
   // Initialize Services with Persistence
   await CartService().init();
   await OrderService().init();
+
+  // Initialize Localization (Saved Pref > Geolocation)
+  await LocaleService().init();
 
   runApp(const MandaApp());
 }

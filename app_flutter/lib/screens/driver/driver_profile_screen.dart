@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../admin/admin_login_screen.dart';
 import '../../widgets/app_drawer.dart';
 import '../../services/app_translations.dart';
+import '../../services/locale_service.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -236,7 +237,31 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   ],
                 ),
               ),
-            )
+            ),
+
+            const SizedBox(height: 16),
+
+            // App Settings
+            Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                leading: const Icon(LucideIcons.globe, color: Colors.blue),
+                title: const Text('Language / Idioma'),
+                subtitle: Text(
+                    Localizations.localeOf(context).languageCode == 'en'
+                        ? 'English'
+                        : 'Português'),
+                trailing: Switch(
+                  value: Localizations.localeOf(context).languageCode == 'pt',
+                  onChanged: (isPt) {
+                    LocaleService().setLocale(
+                        isPt ? const Locale('pt') : const Locale('en'));
+                  },
+                  activeColor: Colors.green,
+                ),
+              ),
+            ),
           ],
         ),
       ),

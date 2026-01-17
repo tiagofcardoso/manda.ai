@@ -141,9 +141,10 @@ class _AppDrawerState extends State<AppDrawer> {
                       const Divider(),
 
                       // Table Order (Visible if Table Mode is active)
-                      if (CartService().tableId != null ||
-                          (_role == null &&
-                              OrderService().currentOrderId != null))
+                      if (_role != 'driver' &&
+                          (CartService().tableId != null ||
+                              (_role == null &&
+                                  OrderService().currentOrderId != null)))
                         ListTile(
                           leading: const Icon(LucideIcons.utensilsCrossed,
                               color: Color(0xFFE63946)),

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:audioplayers/audioplayers.dart';
 import 'dart:convert';
 import '../services/app_translations.dart';
 import '../utils/image_helper.dart';
@@ -20,6 +21,8 @@ class KitchenScreen extends StatefulWidget {
 class _KitchenScreenState extends State<KitchenScreen> {
   final _supabase = Supabase.instance.client;
   RealtimeChannel? _subscription;
+  final _audioPlayer = AudioPlayer();
+  bool _isSoundEnabled = true;
 
   @override
   void initState() {
@@ -30,6 +33,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
   @override
   void dispose() {
     _subscription?.unsubscribe();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -54,6 +58,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
               setState(() {});
 
               if (payload.eventType == PostgresChangeEvent.insert) {
+                if (_isSoundEnabled) {
+                  _playNotificationSound();
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                       content: Text(
@@ -64,6 +71,20 @@ class _KitchenScreenState extends State<KitchenScreen> {
           },
         )
         .subscribe();
+  }
+
+  Future<void> _playNotificationSound() async {
+    try {
+      final langCode = Localizations.localeOf(context).languageCode;
+      final soundFile = langCode == 'pt'
+          ? 'sounds/notification_portugues.mp3'
+          : 'sounds/notification_english.mp3';
+
+      // Plays localized sound
+      await _audioPlayer.play(AssetSource(soundFile), volume: 1.0);
+    } catch (e) {
+      debugPrint("Error playing sound: $e");
+    }
   }
 
   // Fetch active orders (pending, prep) via BACKEND API (Bypasses RLS)
@@ -286,6 +307,19 @@ class _KitchenScreenState extends State<KitchenScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: textColor,
         actions: [
+          IconButton(
+            icon:
+                Icon(_isSoundEnabled ? LucideIcons.bell : LucideIcons.bellOff),
+            color: _isSoundEnabled ? Colors.amber : Colors.grey,
+            onPressed: () {
+              setState(() {
+                _isSoundEnabled = !_isSoundEnabled;
+              });
+              if (_isSoundEnabled) {
+                _playNotificationSound(); // Preview sound
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(LucideIcons.refreshCw),
             onPressed: () => setState(() {}),

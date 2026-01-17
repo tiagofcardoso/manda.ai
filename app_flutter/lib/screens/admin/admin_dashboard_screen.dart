@@ -7,6 +7,7 @@ import 'admin_sales_screen.dart';
 
 import '../../widgets/app_drawer.dart';
 import 'admin_orders_screen.dart';
+import '../kitchen_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -145,10 +146,13 @@ class AdminDashboardScreen extends StatelessWidget {
                     ),
                     _buildActionCard(
                       context,
-                      AppTranslations.of(context, 'settings'),
-                      'assets/images/icon_settings_3d.png',
-                      Colors.grey,
-                      () {},
+                      AppTranslations.of(context, 'kitchenDisplayTitle'),
+                      'assets/images/icon_products_3d.png',
+                      Colors.deepOrange,
+                      () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const KitchenScreen())),
                     ),
                   ],
                 ),
