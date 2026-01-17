@@ -219,6 +219,19 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                 backgroundColor: Colors.green),
           );
         }
+      } else if (newStatus == 'in_progress') {
+        // [NEW] Update Order Status to 'on_way' so client sees status change
+        await _supabase
+            .from('orders')
+            .update({'status': 'on_way'}).eq('id', orderId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Status updated: $newStatus 🚀'),
+                backgroundColor: Colors.blue),
+          );
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

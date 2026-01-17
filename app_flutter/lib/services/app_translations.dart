@@ -28,6 +28,7 @@ class AppTranslations {
       'statusPending': 'Order Received',
       'statusPrep': 'Preparing',
       'statusReady': 'Ready to Pickup',
+      'statusOnWay': 'Out for Delivery',
       'orderReadyMessage':
           'Your food is ready! Please collect it at the counter.',
       'kitchenLogin': 'Kitchen Login',
@@ -155,6 +156,7 @@ class AppTranslations {
       'statusPending': 'Pedido Recebido',
       'statusPrep': 'Preparando',
       'statusReady': 'Pronto para Retirar',
+      'statusOnWay': 'Saiu para entrega',
       'orderReadyMessage':
           'Seu pedido está pronto! Por favor, retire no balcão.',
       'kitchenLogin': 'Login da Cozinha',
