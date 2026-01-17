@@ -140,16 +140,21 @@ class AppTranslations {
       'kickScooter': 'Kick Scooter',
       'skates': 'Roller Skates',
       'otherVehicle': 'Other',
-    },
-    'pt': {
-      'appTitle': 'Manda.AI',
-      'welcome': 'Bem-vindo',
-      'scanTable': 'Escanear QR Code',
-// ... (omitting unchanged lines for brevity if possible, but replace_file_content needs contigous block)
-// Actually I will just target the end of the 'en' block and insert there, then target end of 'pt' block.
-// Better to do one replace if possible or split. The file is small enough to do a larger replace or 2 separate ones.
-// I'll do two separate replacements to be safe.
-// WAIT: replace_file_content allows replacing a block. I can replacing the end of 'en' map.
+      // Landing Page
+      'landingHeroBadge': '🚀 The Future of Delivery Management',
+      'landingTitle': 'Manage Orders,\nTrack Drivers,\nGrow Faster.',
+      'landingDesc':
+          'Manda.AI is the all-in-one ecosystem for modern restaurants.\nSeamless kitchen display, real-time driver tracking, and powerful analytics.',
+      'whyManda': 'Why Manda.AI?',
+      'featureKitchen': 'Smart Kitchen',
+      'featureKitchenDesc': 'Replace paper tickets with digital KDS.',
+      'featureDriver': 'Driver Tracking',
+      'featureDriverDesc': 'Real-time GPS tracking for every delivery.',
+      'featureAdmin': 'Admin Insights',
+      'featureAdminDesc': 'Detailed analytics and sales reports.',
+      'navFeatures': 'Features',
+      'navDrivers': 'For Drivers',
+      'navRestaurants': 'For Restaurants',
     },
     'pt': {
       'appTitle': 'Manda.AI',
@@ -287,6 +292,21 @@ class AppTranslations {
       'kickScooter': 'Patinete',
       'skates': 'Patins',
       'otherVehicle': 'Outro',
+      // Landing Page
+      'landingHeroBadge': '🚀 O Futuro da Gestão de Entregas',
+      'landingTitle': 'Gerencie Pedidos,\nSiga Estafetas,\nCresça Rápido.',
+      'landingDesc':
+          'Manda.AI é o ecossistema completo para restaurantes modernos.\nKDS digital, rastreio em tempo real e análises poderosas.',
+      'whyManda': 'Por que Manda.AI?',
+      'featureKitchen': 'Cozinha Inteligente',
+      'featureKitchenDesc': 'Substitua papel por KDS digital.',
+      'featureDriver': 'Rastreio de Estafetas',
+      'featureDriverDesc': 'GPS em tempo real para cada entrega.',
+      'featureAdmin': 'Análise Admin',
+      'featureAdminDesc': 'Relatórios detalhados de vendas.',
+      'navFeatures': 'Funcionalidades',
+      'navDrivers': 'Para Estafetas',
+      'navRestaurants': 'Para Restaurantes',
     },
   };
 

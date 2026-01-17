@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
 
-import 'screens/landing_screen.dart';
+import 'screens/landing_screen.dart' as mobile_landing;
+import 'screens/web/landing_screen.dart' as web_landing;
+import 'screens/admin/admin_login_screen.dart';
+
 import 'services/theme_service.dart';
 import 'services/locale_service.dart';
 import 'services/cart_service.dart';
@@ -105,7 +109,13 @@ class MandaApp extends StatelessWidget {
                     color: const Color(0xFF1E1E1E),
                   ),
                 ),
-                home: const LandingScreen(),
+                home: kIsWeb
+                    ? const web_landing.LandingScreen()
+                    : const mobile_landing.LandingScreen(),
+                routes: {
+                  '/login': (context) => const mobile_landing.LandingScreen(),
+                  '/admin': (context) => const AdminLoginScreen(),
+                },
               );
             });
       },
