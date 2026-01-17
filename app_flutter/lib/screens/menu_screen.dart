@@ -58,6 +58,17 @@ class _MenuScreenState extends State<MenuScreen> {
         _userRole = role;
         _isLoadingRole = false;
       });
+
+      // CRITICAL: If user is a client (logged in), ensure they're NOT in stale table mode
+      // BUT: If they explicitly scanned a QR code, KEEP the tableId (allow Client + Table)
+      if (role == 'client' &&
+          _cartService.tableId != null &&
+          !_cartService.isExplicitTableMode) {
+        print(
+            'DEBUG: Clearing STALE tableId for logged-in client (not from QR scan)');
+        _cartService.setDeliveryAddress(
+            ''); // This will clear tableId via mutual exclusivity
+      }
     }
   }
 
@@ -655,9 +666,10 @@ class _MenuScreenState extends State<MenuScreen> {
                           if (_isLoadingRole) return;
 
                           final currentUser = AuthService().currentUser;
+                          final isTableMode = CartService().tableId != null;
 
-                          // 1. Guest Check (Not Logged In) -> Redirect to Login
-                          if (currentUser == null) {
+                          // 1. Guest Check (Not Logged In) -> Allow IF Table Mode
+                          if (currentUser == null && !isTableMode) {
                             ScaffoldMessenger.of(context).hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -675,9 +687,9 @@ class _MenuScreenState extends State<MenuScreen> {
                             return;
                           }
 
-                          // 2. Staff/Restriction Check
-                          // If Logged In but NOT 'client' (e.g. Admin, Driver, or Unknown), Block.
-                          if (_userRole != 'client') {
+                          // 2. Staff/Restriction Check (Only if Logged In)
+                          // Guests (currentUser == null) bypass this check.
+                          if (currentUser != null && _userRole != 'client') {
                             ScaffoldMessenger.of(context).hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -773,8 +785,8 @@ class _MenuScreenState extends State<MenuScreen> {
                 ElevatedButton(
                   onPressed: () {
                     if (controller.text.isNotEmpty) {
-                      CartService()
-                          .setTableId(controller.text); // Pass string directly
+                      CartService().setTableId(controller.text,
+                          explicit: true); // Manual entry = explicit
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text(

@@ -77,7 +77,8 @@ class _ScanScreenState extends State<ScanScreen> {
       final tableNumber = response!['table_number'];
 
       // Update global CartService so Checkout knows the table!
-      CartService().setTableId(tableNumber.toString());
+      CartService().setTableId(tableNumber.toString(),
+          explicit: true); // QR scan = explicit
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:flutter/foundation.dart'; // Needed for kIsWeb
-import 'package:supabase_flutter/supabase_flutter.dart'; // Added Supabase import
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
 import '../models/cart_item.dart';
-import 'order_tracking_screen.dart';
 import '../services/app_translations.dart';
 import '../services/auth_service.dart';
-import '../../constants/api.dart'; // Ensure API constants are used
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -175,8 +171,35 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
       final tableId = widget.cartService.tableId;
       final user = AuthService().currentUser;
 
-      // 1. Enforce Auth for Delivery
-      if (tableId == null && user == null) {
+      // ====================================================
+      // A) TABLE ORDERS (Dine-In)
+      // ====================================================
+      if (tableId != null) {
+        // Guests ALLOWED. No Address Required.
+        final payload = {
+          "table_id": tableId,
+          "total": widget.cartService.totalAmount,
+          "items": widget.cartService.items
+              .map((item) => {
+                    "product_id": item.product.id,
+                    "quantity": item.quantity,
+                    "price": item.product.price,
+                    "notes": item.notes
+                  })
+              .toList()
+        };
+
+        // Call Dedicated Table Endpoint
+        final response = await OrderService().placeTableOrder(payload);
+        _handleSuccess(response['order_id']);
+        return;
+      }
+
+      // ====================================================
+      // B) DELIVERY ORDERS (Client)
+      // ====================================================
+      // 1. Enforce Auth
+      if (user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -185,9 +208,7 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
               action: SnackBarAction(
                 label: 'LOGIN',
                 textColor: Colors.white,
-                onPressed: () {
-                  Navigator.pop(context);
-                },
+                onPressed: () => Navigator.pop(context),
               ),
             ),
           );
@@ -195,38 +216,32 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
         return;
       }
 
-      // 2. Determine Address (Snapshot)
-      String deliveryAddress = 'Table Service';
-      if (tableId == null) {
-        // Fetch recent profile data to get address
-        try {
-          final profile = await Supabase.instance.client
-              .from('profiles')
-              .select('street, city, zip_code')
-              .eq('id', user!.id)
-              .single();
+      // 2. Determine Address
+      String deliveryAddress = '';
+      try {
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select('street, city, zip_code')
+            .eq('id', user.id)
+            .single();
 
-          final street = profile['street'] ?? '';
-          final city = profile['city'] ?? '';
+        final street = profile['street'] ?? '';
+        final city = profile['city'] ?? '';
 
-          if (street.toString().trim().isEmpty) {
-            throw Exception(
-                'Please update your address in Profile before ordering.');
-          }
-
-          deliveryAddress = '$street, $city';
-        } catch (e) {
-          if (e.toString().contains('Please update')) rethrow;
-          deliveryAddress = 'Address not found';
+        if (street.toString().trim().isEmpty) {
+          throw Exception(
+              'Please update your address in Profile before ordering.');
         }
+
+        deliveryAddress = '$street, $city';
+      } catch (e) {
+        if (e.toString().contains('Please update')) rethrow;
+        deliveryAddress = 'Address not found';
       }
 
       final payload = {
-        "user_id": user?.id,
-        "table_id": tableId
-            ?.toString(), // Can be null for delivery, converted to String if present
+        "user_id": user.id,
         "total": widget.cartService.totalAmount,
-        "status": "pending",
         "delivery_address": deliveryAddress,
         "items": widget.cartService.items
             .map((item) => {
@@ -238,36 +253,9 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
             .toList()
       };
 
-      // Send to Backend
-      final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/orders'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(payload),
-      );
-
-      if (response.statusCode == 200) {
-        final respJson = jsonDecode(response.body);
-        final orderId = respJson['order_id'];
-
-        // Save globally
-        OrderService().setOrderId(orderId);
-        widget.cartService.clear();
-
-        if (mounted) {
-          Navigator.pop(context); // Close Cart
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  '${AppTranslations.of(context, 'orderPlaced')} ${AppTranslations.of(context, 'checkOrdersTab')}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      } else {
-        throw Exception('Failed to place order: ${response.body}');
-      }
+      // Call Dedicated Delivery Endpoint
+      final response = await OrderService().placeDeliveryOrder(payload);
+      _handleSuccess(response['order_id']);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -275,6 +263,24 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _handleSuccess(String orderId) {
+    OrderService().setOrderId(orderId);
+    widget.cartService.clear();
+
+    if (mounted) {
+      Navigator.pop(context); // Close Cart
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '${AppTranslations.of(context, 'orderPlaced')} ${AppTranslations.of(context, 'checkOrdersTab')}'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -322,6 +328,19 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
                           style: TextStyle(
                               color: textColor, fontWeight: FontWeight.bold),
                         ),
+                        if (tableId != null) ...[
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              widget.cartService.setDeliveryAddress(
+                                  'Reset'); // Clears Table ID
+                              // Force rebuild
+                              setState(() {});
+                            },
+                            child: const Icon(LucideIcons.xCircle,
+                                color: Colors.red, size: 20),
+                          )
+                        ]
                       ],
                     ),
                   ),

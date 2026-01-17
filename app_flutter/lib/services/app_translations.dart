@@ -130,6 +130,7 @@ class AppTranslations {
       'signInAction': 'Sign In',
       'startDelivery': 'Start Delivery',
       'finishDelivery': 'Done',
+      'tableOrder': 'Table Order',
     },
     'pt': {
       'appTitle': 'Manda.AI',
@@ -255,9 +256,9 @@ class AppTranslations {
       'state': 'Estado',
       'country': 'País',
       'requiredField': 'Obrigatório',
-      'signInAction': 'Entrar',
       'startDelivery': 'Iniciar Entrega',
       'finishDelivery': 'Entregue',
+      'tableOrder': 'Mesa',
     },
   };
 

@@ -35,6 +35,8 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
           .from('orders')
           .select()
           .eq('user_id', user.id) // Correct column is user_id
+          .neq(
+              'order_type', 'dine_in') // Ensure we don't show Table orders here
           .order('created_at', ascending: false);
 
       if (mounted) {
@@ -81,6 +83,11 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
       appBar: AppBar(
         title: Text(AppTranslations.of(context, 'myOrders')),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(LucideIcons.arrowLeft, color: Colors.grey),
+          onPressed: () => Navigator.of(context)
+              .pushNamedAndRemoveUntil('/', (route) => false),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

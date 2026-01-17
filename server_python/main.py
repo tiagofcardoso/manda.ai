@@ -20,108 +20,132 @@ app.add_middleware(
 def read_root():
     return {"message": "Manda.AI Backend is running"}
 
-class OrderRequest(BaseModel):
-    table_id: str | None = None
+class TableOrderRequest(BaseModel):
+    table_id: str
     items: list
     total: float
-    user_id: str | None = None
-    delivery_address: str | None = None
-    status: str | None = None
+    # No user_id or address required for Table/Guest
 
-@app.post("/orders")
-def place_order(order: OrderRequest):
+class DeliveryOrderRequest(BaseModel):
+    items: list
+    total: float
+    user_id: str
+    delivery_address: str
+    # No table_id allowed
+
+@app.post("/orders/table")
+def place_table_order(order: TableOrderRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
-    try:
-        establishment_id = None
-        
-        # 1. Try to get Establishment from Table if provided
-        # 1. Try to get Establishment from Table if provided
-        if order.table_id:
-             # Handle short "Table Number" (e.g. "5")
-            if len(order.table_id) < 10:
-                print(f"Resolving Table Number: {order.table_id}")
-                # Try finding the table by number. Note: table_number might be "05" or "5".
-                # We'll try exact match first.
-                table_res = supabase.table("tables").select("id, establishment_id").eq("table_number", order.table_id).execute()
-                
-                # If not found, try padding with 0 (e.g. "5" -> "05")
-                if not table_res.data and len(order.table_id) == 1:
-                     padded = f"0{order.table_id}"
-                     table_res = supabase.table("tables").select("id, establishment_id").eq("table_number", padded).execute()
-                     
-                if table_res.data:
-                    print(f"Resolved to UUID: {table_res.data[0]['id']}")
-                    order.table_id = table_res.data[0]['id'] # Replace with real UUID
-                    establishment_id = table_res.data[0]['establishment_id']
-                else:
-                    print(f"Table {order.table_id} not found. Falling back to Delivery Mode.")
-                    order.table_id = None # Invalid table number -> convert to Delivery
-            else:
-                # UUID provided
-                try:
-                    table_res = supabase.table("tables").select("establishment_id").eq("id", order.table_id).execute()
-                    if table_res.data:
-                        establishment_id = table_res.data[0]['establishment_id']
-                except Exception as e:
-                     print(f"Error querying table UUID: {e}")
-                     order.table_id = None
-        
-        # 2. Fallback / Default logic (for Delivery or invalid table)
-        if not establishment_id:
-             # Just grab the first establishment (Dev mode shortcut)
-             # In production, we should probably require establishment_id in the request
-             est_res = supabase.table("establishments").select("id").limit(1).execute()
-             if est_res.data:
-                 establishment_id = est_res.data[0]['id']
-        
-        if not establishment_id:
-             raise HTTPException(status_code=400, detail="Invalid Establishment (No default found)")
+    # 1. Validate Table
+    establishment_id = None
+    final_table_id = None
+    
+    if len(order.table_id) < 10:
+        # Resolve short number
+        print(f"Resolving Table Number: {order.table_id}")
+        table_res = supabase.table("tables").select("id, establishment_id").eq("table_number", order.table_id).execute()
+        if not table_res.data and len(order.table_id) == 1:
+            padded = f"0{order.table_id}"
+            table_res = supabase.table("tables").select("id, establishment_id").eq("table_number", padded).execute()
+            
+        if table_res.data:
+            final_table_id = table_res.data[0]['id']
+            establishment_id = table_res.data[0]['establishment_id']
+        else:
+             raise HTTPException(status_code=400, detail="Invalid Table Number")
+    else:
+        # UUID
+        final_table_id = order.table_id
+        try:
+            table_res = supabase.table("tables").select("establishment_id").eq("id", final_table_id).execute()
+            if table_res.data:
+                establishment_id = table_res.data[0]['establishment_id']
+        except Exception:
+             pass
 
-        # 3. Create Order
-        order_data = {
-            "establishment_id": establishment_id,
-            "table_id": order.table_id, # Can be None
-            "user_id": order.user_id,
-            "total_amount": order.total,
-            "status": order.status or "pending",
-            "delivery_address": order.delivery_address
-        }
-        
-        new_order = supabase.table("orders").insert(order_data).execute()
-        order_id = new_order.data[0]['id']
+    if not establishment_id:
+         raise HTTPException(status_code=400, detail="Invalid Table/Establishment")
 
-        # 3. Create Order Items
-        items_data = []
-        for item in order.items:
-            items_data.append({
-                "order_id": order_id,
-                "product_id": item['product_id'],
-                "quantity": item['quantity'],
-                "unit_price": item['price'], # Map frontend 'price' to DB 'unit_price'
-                "notes": item.get('notes')
-            })
-        
-        if items_data:
-            supabase.table("order_items").insert(items_data).execute()
+    # 2. Create Order (Dine-In)
+    order_data = {
+        "establishment_id": establishment_id,
+        "table_id": final_table_id,
+        "order_type": "dine_in", # Explicit Flag
+        "total_amount": order.total,
+        "status": "pending",
+        # user_id is null for guests
+    }
+    
+    new_order = supabase.table("orders").insert(order_data).execute()
+    order_id = new_order.data[0]['id']
 
-        # 4. Auto-Create Delivery Request if it's a Delivery Order (No Table)
-        if not order.table_id:
-             delivery_data = {
-                 "order_id": order_id,
-                 "status": "open",
-                 "address": order.delivery_address, # Pass address to delivery
-                 "current_lat": 38.7223, # Shop location
-                 "current_lng": -9.1393 
-             }
-             supabase.table("deliveries").insert(delivery_data).execute()
+    # 3. Create Items
+    _insert_order_items(order_id, order.items)
 
-        return {"status": "success", "order_id": order_id}
+    return {"status": "success", "order_id": order_id, "type": "dine_in"}
 
-    except Exception as e:
-        print(f"Error placing order: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/orders/delivery")
+def place_delivery_order(order: DeliveryOrderRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    # 1. Validate Establishment (Default for now)
+    est_res = supabase.table("establishments").select("id").limit(1).execute()
+    establishment_id = est_res.data[0]['id'] if est_res.data else None
+    
+    if not establishment_id:
+         raise HTTPException(status_code=500, detail="No Establishment Configured")
+
+    # 2. Create Order (Delivery)
+    order_data = {
+        "establishment_id": establishment_id,
+        "user_id": order.user_id,
+        "order_type": "delivery", # Explicit Flag
+        "total_amount": order.total,
+        "status": "pending",
+        "delivery_address": order.delivery_address
+    }
+    
+    new_order = supabase.table("orders").insert(order_data).execute()
+    order_id = new_order.data[0]['id']
+
+    # 3. Create Items
+    _insert_order_items(order_id, order.items)
+
+    # 4. Trigger Delivery Logic (Driver Assignment)
+    delivery_data = {
+        "order_id": order_id,
+        "status": "open",
+        "address": order.delivery_address,
+        "current_lat": 38.7223,
+        "current_lng": -9.1393 
+    }
+    supabase.table("deliveries").insert(delivery_data).execute()
+
+    return {"status": "success", "order_id": order_id, "type": "delivery"}
+
+def _insert_order_items(order_id, items):
+    items_data = []
+    for item in items:
+        items_data.append({
+            "order_id": order_id,
+            "product_id": item['product_id'],
+            "quantity": item['quantity'],
+            "unit_price": item['price'],
+            "notes": item.get('notes')
+        })
+    
+    if items_data:
+        supabase.table("order_items").insert(items_data).execute()
+
+# Kept for backward compatibility if needed, but deprecated
+@app.post("/orders") 
+def place_order_legacy(order: dict):
+    raise HTTPException(status_code=410, detail="Endpoint Deprecated. Use /orders/table or /orders/delivery")
+
+
 
 # --- KDS ENDPOINTS ---
 

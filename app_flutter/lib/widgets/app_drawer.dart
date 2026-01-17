@@ -8,6 +8,10 @@ import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/kitchen_screen.dart';
 import '../screens/driver/driver_home_screen.dart';
 import '../screens/scan_screen.dart';
+import '../screens/client_orders_screen.dart';
+import '../screens/guest_table_order_screen.dart';
+import '../services/cart_service.dart';
+import '../services/order_service.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -55,7 +59,6 @@ class _AppDrawerState extends State<AppDrawer> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return Drawer(
       child: Column(
@@ -127,6 +130,27 @@ class _AppDrawerState extends State<AppDrawer> {
                         ),
 
                       const Divider(),
+
+                      // Table Order (Visible if Table Mode is active)
+                      if (CartService().tableId != null ||
+                          (_role == null &&
+                              OrderService().currentOrderId != null))
+                        ListTile(
+                          leading: const Icon(LucideIcons.utensilsCrossed,
+                              color: Color(0xFFE63946)),
+                          title:
+                              Text(AppTranslations.of(context, 'tableOrder')),
+                          onTap: () =>
+                              _navigateTo(const GuestTableOrderScreen()),
+                        ),
+
+                      // My Orders (Client History)
+                      if (_role == 'client')
+                        ListTile(
+                          leading: const Icon(LucideIcons.shoppingBag),
+                          title: Text(AppTranslations.of(context, 'myOrders')),
+                          onTap: () => _navigateTo(const ClientOrdersScreen()),
+                        ),
 
                       // Scan QR (Clients Only)
                       if (_role == 'client' || _role == null)

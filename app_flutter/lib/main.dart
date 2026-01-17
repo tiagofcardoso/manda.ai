@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/landing_screen.dart';
 import 'services/theme_service.dart';
 import 'services/locale_service.dart';
+import 'services/cart_service.dart';
+import 'services/order_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,10 @@ Future<void> main() async {
       anonKey: supabaseKey,
     );
   }
+
+  // Initialize Services with Persistence
+  await CartService().init();
+  await OrderService().init();
 
   runApp(const MandaApp());
 }

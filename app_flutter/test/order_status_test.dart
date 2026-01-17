@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:manda_client/services/app_translations.dart';
 
 void main() {
   group('Order Status Flow Logic', () {
