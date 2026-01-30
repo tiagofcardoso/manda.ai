@@ -59,6 +59,7 @@ dependencies:
   audioplayers: ^6.4.0
   carousel_slider: ^5.1.1
   animate_do: ^3.3.4
+  video_player: ^2.9.0
 
 
 # ...
@@ -106,6 +107,7 @@ flutter:
     - lib/.env
     - assets/images/
     - assets/sounds/
+    - assets/videos/
     #- images/
 
 

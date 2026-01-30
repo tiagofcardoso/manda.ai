@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'screens/landing_screen.dart' as mobile_landing;
 import 'screens/web/landing_screen.dart' as web_landing;
@@ -39,6 +40,15 @@ Future<void> main() async {
 
   // Initialize Localization (Saved Pref > Geolocation)
   await LocaleService().init();
+
+  // Enable Edge-to-Edge UI for premium look
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.dark));
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   runApp(const MandaApp());
 }

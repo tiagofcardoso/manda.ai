@@ -18,6 +18,7 @@ import 'driver/driver_home_screen.dart';
 import 'client_orders_screen.dart'; // Import Client Orders
 import 'scan_screen.dart';
 import '../constants/categories.dart';
+import 'package:animate_do/animate_do.dart';
 import 'package:flutter/services.dart'; // For barcode scanner usually, but using mock for now or simple dialog logic
 
 class MenuScreen extends StatefulWidget {
@@ -115,7 +116,8 @@ class _MenuScreenState extends State<MenuScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      // No explicit background color, uses Theme.scaffoldBackgroundColor
+      // Allow body to extend behind app bar and potential floating transparency
+      extendBody: true,
       drawer: Drawer(
         // Drawer color uses Theme default or override if needed
         child: ListView(
@@ -411,11 +413,11 @@ class _MenuScreenState extends State<MenuScreen> {
             children: [
               // Categories List
               Container(
-                height: 100,
+                height: 70, // Reduced height for Pill style
                 color: Theme.of(context).scaffoldBackgroundColor,
                 child: ListView.builder(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   scrollDirection: Axis.horizontal,
                   itemCount: availableCategoryIds.length,
                   itemBuilder: (context, index) {
@@ -423,59 +425,78 @@ class _MenuScreenState extends State<MenuScreen> {
                     final catData = categoryIdsMap[catId]!;
                     final isSelected = _selectedCategory == catId;
 
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = catId),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 16),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFFE63946)
-                                    : (isDark
-                                        ? Colors.grey[800]
-                                        : Colors.white),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  if (!isDark)
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    )
-                                ],
-                              ),
-                              child: Icon(
-                                catData['icon'],
-                                size: 28,
-                                color: isSelected
+                    // Dynamic Translation Logic
+                    final isEnglish =
+                        Localizations.localeOf(context).languageCode == 'en';
+                    final label = isEnglish
+                        ? (catData['en_label'] ?? catData['label'])
+                        : catData['label'];
+
+                    return FadeInRight(
+                      delay: Duration(milliseconds: index * 50),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedCategory = catId),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? (isDark
                                     ? Colors.white
+                                    : const Color(
+                                        0xFF1E1E1E)) // Dark/White contrast
+                                : (isDark ? Colors.grey[900] : Colors.white),
+                            borderRadius:
+                                BorderRadius.circular(30), // Pill Shape
+                            border: isSelected
+                                ? null
+                                : Border.all(
+                                    color: isDark
+                                        ? Colors.white12
+                                        : Colors.black12),
+                            boxShadow: [
+                              if (!isSelected && !isDark)
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                catData['icon'],
+                                size: 20,
+                                color: isSelected
+                                    ? (isDark
+                                        ? Colors.black
+                                        : Colors.white) // Icon Color contrast
                                     : (isDark
                                         ? Colors.white70
                                         : Colors.black87),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              catData['label'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? (isDark
-                                        ? Colors.white
-                                        : const Color(0xFFE63946))
-                                    : (isDark
-                                        ? Colors.grey[400]
-                                        : Colors.grey[800]),
+                              const SizedBox(width: 8),
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? (isDark
+                                          ? Colors.black
+                                          : Colors.white) // Text Color contrast
+                                      : (isDark
+                                          ? Colors.white70
+                                          : Colors.black87),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -483,7 +504,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
 
-              // Products Grid
+              // Products Grid (Wrapped in padding for bottom nav)
               Expanded(
                 child: filteredProducts.isEmpty
                     ? Center(
@@ -502,7 +523,13 @@ class _MenuScreenState extends State<MenuScreen> {
                               width > 600 ? 0.85 : 0.8; // Shorter cards
 
                           return GridView.builder(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                top: 16,
+                                bottom:
+                                    100 // Extra padding for Floating Nav Bar
+                                ),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: crossAxisCount,
@@ -529,46 +556,51 @@ class _MenuScreenState extends State<MenuScreen> {
           final count = items.fold(0, (sum, item) => sum + item.quantity);
           if (count == 0) return const SizedBox.shrink();
 
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              FloatingActionButton(
-                backgroundColor: const Color(0xFFE63946),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CartScreen()),
-                  );
-                },
-                child: const Icon(LucideIcons.shoppingBag, color: Colors.white),
-              ),
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: const Color(0xFFE63946), width: 2),
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 24,
-                    minHeight: 24,
-                  ),
-                  child: Text(
-                    '$count',
-                    style: const TextStyle(
-                      color: Color(0xFFE63946),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 80.0), // Raise above nav bar
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                FloatingActionButton(
+                  backgroundColor: const Color(0xFFE63946),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const CartScreen()),
+                    );
+                  },
+                  child:
+                      const Icon(LucideIcons.shoppingBag, color: Colors.white),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: const Color(0xFFE63946), width: 2),
                     ),
-                    textAlign: TextAlign.center,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                    child: Text(
+                      '$count',
+                      style: const TextStyle(
+                        color: Color(0xFFE63946),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -577,48 +609,72 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Widget _buildProductCard(BuildContext context, Product product) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // print('DEBUG: Building card. Role: $_userRole');
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color, // Use Theme Card Color
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(20), // Softer corners
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           )
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Image Header
+          // Image Header with Hero tag for potential detail view transition
           Expanded(
-            flex: 3,
-            child: ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image(
-                image: _getImageForProduct(product),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                    color: isDark ? Colors.grey[800] : Colors.grey[200],
-                    child: Icon(LucideIcons.alertCircle,
-                        color: isDark ? Colors.white : Colors.black)),
-              ),
+            flex: 4, // More space for image
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Image(
+                      image: _getImageForProduct(product),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                          color: isDark ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(LucideIcons.alertCircle,
+                              color: isDark ? Colors.white : Colors.black)),
+                    ),
+                  ),
+                ),
+                // Gradient Overlay for better contrast if we had text over image,
+                // but here it adds depth
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(20)),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.1),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
           // Content
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.start, // content at top
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -631,6 +687,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).textTheme.bodyLarge?.color,
+                          letterSpacing: 0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -641,21 +698,21 @@ class _MenuScreenState extends State<MenuScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          height: 1.1,
+                          height: 1.2,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
                         NumberFormat.currency(symbol: product.currency)
                             .format(product.price),
                         style: const TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
                           color: Color(0xFFE63946),
                         ),
                       ),
@@ -668,7 +725,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           final currentUser = AuthService().currentUser;
                           final isTableMode = CartService().tableId != null;
 
-                          // 1. Guest Check (Not Logged In) -> Allow IF Table Mode
+                          // 1. Guest Check
                           if (currentUser == null && !isTableMode) {
                             ScaffoldMessenger.of(context).hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -687,8 +744,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             return;
                           }
 
-                          // 2. Staff/Restriction Check (Only if Logged In)
-                          // Guests (currentUser == null) bypass this check.
+                          // 2. Staff/Restriction Check
                           if (currentUser != null && _userRole != 'client') {
                             ScaffoldMessenger.of(context).hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -713,7 +769,6 @@ class _MenuScreenState extends State<MenuScreen> {
                                   const Icon(LucideIcons.checkCircle,
                                       color: Colors.green),
                                   const SizedBox(width: 8),
-                                  // Text must be black on light yellow background
                                   Text(
                                       '${product.name} ${AppTranslations.of(context, 'itemAdded')}',
                                       style: const TextStyle(
@@ -721,8 +776,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                 ],
                               ),
                               behavior: SnackBarBehavior.floating,
-                              backgroundColor:
-                                  Colors.yellow[100], // Amarelo Fraquinho
+                              backgroundColor: Colors.yellow[100],
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10)),
                               duration: const Duration(seconds: 2),
@@ -730,17 +784,25 @@ class _MenuScreenState extends State<MenuScreen> {
                           );
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: (_userRole != null && _userRole != 'client')
                                 ? Colors.grey
                                 : const Color(0xFFE63946),
-                            shape: BoxShape.circle,
+                            borderRadius:
+                                BorderRadius.circular(12), // Rounded Square
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE63946).withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              )
+                            ],
                           ),
                           child: _isLoadingRole
                               ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
+                                  width: 18,
+                                  height: 18,
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2, color: Colors.white))
                               : Icon(
