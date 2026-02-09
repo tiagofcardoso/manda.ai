@@ -468,6 +468,10 @@ def get_today_stats(user = Depends(get_current_admin)):
         active_orders = len([o for o in orders if o['status'] in ['pending', 'prep', 'ready', 'on_way']])
         completed_orders = len([o for o in orders if o['status'] in ['delivered', 'completed']])
         
+        # Dashboard Specifics
+        kitchen_count = len([o for o in orders if o['status'] in ['pending', 'prep']])
+        delivery_count = len([o for o in orders if o.get('order_type') == 'delivery'])
+
         avg_order_value = total_revenue / total_orders if total_orders > 0 else 0.0
         
         return {
@@ -475,6 +479,8 @@ def get_today_stats(user = Depends(get_current_admin)):
             "total_revenue": round(total_revenue, 2),
             "active_orders": active_orders,
             "completed_orders": completed_orders,
+            "kitchen_count": kitchen_count,
+            "delivery_count": delivery_count,
             "avg_order_value": round(avg_order_value, 2)
         }
     except Exception as e:

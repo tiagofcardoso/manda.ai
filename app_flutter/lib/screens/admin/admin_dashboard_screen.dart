@@ -1,19 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+
 import '../../services/app_translations.dart';
+import '../../constants/api.dart';
 import 'admin_products_screen.dart';
 import 'admin_sales_screen.dart';
 import 'admin_orders_screen.dart';
 import '../kitchen_screen.dart';
-
 import '../../widgets/admin/admin_scaffold.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  Map<String, dynamic> _stats = {
+    "total_revenue": 0.0,
+    "total_orders": 0,
+    "delivery_count": 0,
+    "kitchen_count": 0
+  };
+  bool _isLoading = true;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+    // Refresh stats every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _fetchStats(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchStats({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
+
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) return;
+
+      final response = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/admin/stats/today'),
+        headers: {
+          "Authorization": "Bearer ${session.accessToken}",
+          "Content-Type": "application/json",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _stats = data;
+            _isLoading = false;
+          });
+        }
+      } else {
+        debugPrint("Error fetching stats: ${response.body}");
+        if (mounted && !silent) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Error fetching stats: $e");
+      if (mounted && !silent) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final currencyFormat =
+        NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
     return AdminScaffold(
       title: AppTranslations.of(context, 'adminDashboard'),
       activeRoute: '/admin-dashboard',
@@ -29,7 +101,9 @@ class AdminDashboardScreen extends StatelessWidget {
                   child: _buildStatCard(
                     context,
                     "Vendas Hoje",
-                    "R\$ 1.250,00",
+                    _isLoading
+                        ? "..."
+                        : currencyFormat.format(_stats['total_revenue']),
                     LucideIcons.dollarSign,
                     Colors.green,
                   ),
@@ -39,18 +113,18 @@ class AdminDashboardScreen extends StatelessWidget {
                   child: _buildStatCard(
                     context,
                     "Pedidos",
-                    "12",
+                    _isLoading ? "..." : "${_stats['total_orders']}",
                     LucideIcons.shoppingBag,
                     Colors.blue,
                   ),
                 ),
-                if (MediaQuery.of(context).size.width > 1200) ...[
+                if (MediaQuery.of(context).size.width > 900) ...[
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildStatCard(
                       context,
                       "Entregas",
-                      "4",
+                      _isLoading ? "..." : "${_stats['delivery_count'] ?? 0}",
                       LucideIcons.bike,
                       Colors.orange,
                     ),
@@ -59,8 +133,8 @@ class AdminDashboardScreen extends StatelessWidget {
                   Expanded(
                     child: _buildStatCard(
                       context,
-                      "Cozinha",
-                      "3",
+                      "Cozinha (Ativos)",
+                      _isLoading ? "..." : "${_stats['kitchen_count'] ?? 0}",
                       LucideIcons.chefHat,
                       Colors.red,
                     ),
@@ -68,6 +142,32 @@ class AdminDashboardScreen extends StatelessWidget {
                 ]
               ],
             ),
+
+            // On smaller screens, show the other 2 cards in a new row
+            if (MediaQuery.of(context).size.width <= 900) ...[
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    "Entregas",
+                    _isLoading ? "..." : "${_stats['delivery_count'] ?? 0}",
+                    LucideIcons.bike,
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    "Cozinha (Ativos)",
+                    _isLoading ? "..." : "${_stats['kitchen_count'] ?? 0}",
+                    LucideIcons.chefHat,
+                    Colors.red,
+                  ),
+                ),
+              ])
+            ],
 
             const SizedBox(height: 32),
 
