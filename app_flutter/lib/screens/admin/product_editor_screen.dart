@@ -207,7 +207,7 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
 
               // Currency Dropdown
               DropdownButtonFormField<String>(
-                value: _selectedCurrency,
+                initialValue: _selectedCurrency,
                 dropdownColor: const Color(0xFF2d2d2d),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
@@ -379,7 +379,7 @@ class _ProductEditorScreenState extends State<ProductEditorScreen> {
 
   Widget _buildCategoryDropdown(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _selectedCategory,
+      initialValue: _selectedCategory,
       dropdownColor: const Color(0xFF2d2d2d),
       style: const TextStyle(color: Colors.white),
       decoration: const InputDecoration(

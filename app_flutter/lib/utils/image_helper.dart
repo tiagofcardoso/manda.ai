@@ -24,6 +24,7 @@ class ImageHelper {
     }
 
     // Fallback to network if URL exists
+    // Fallback to network if URL exists
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return NetworkImage(imageUrl);
     }
@@ -34,12 +35,12 @@ class ImageHelper {
 
   // Helper widget builder for consistent parsing
   static Widget buildProductImage(String? name, String? url,
-      {double width = 50, double height = 50}) {
+      {double width = 50, double height = 50, BoxFit fit = BoxFit.cover}) {
     return Image(
       image: getProductImage(name, url),
       width: width,
       height: height,
-      fit: BoxFit.cover,
+      fit: fit,
       errorBuilder: (context, error, stackTrace) {
         return Container(
           width: width,

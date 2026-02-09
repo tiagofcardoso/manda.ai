@@ -182,7 +182,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                             fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedVehicle,
+                      initialValue: _selectedVehicle,
                       decoration: InputDecoration(
                         labelText: AppTranslations.of(context, 'vehicleType'),
                         border: const OutlineInputBorder(),
@@ -258,7 +258,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     LocaleService().setLocale(
                         isPt ? const Locale('pt') : const Locale('en'));
                   },
-                  activeColor: Colors.green,
+                  activeThumbColor: Colors.green,
                 ),
               ),
             ),

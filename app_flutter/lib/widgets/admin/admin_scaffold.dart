@@ -1,0 +1,251 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../screens/admin/admin_dashboard_screen.dart';
+import '../../screens/admin/admin_orders_screen.dart';
+import '../../screens/admin/admin_products_screen.dart';
+import '../../screens/admin/admin_sales_screen.dart';
+import '../../screens/kitchen_screen.dart';
+
+class AdminScaffold extends StatelessWidget {
+  final String title;
+  final Widget body;
+  final Widget? floatingActionButton;
+  final bool showSidebar;
+  final String activeRoute;
+  final List<Widget>? actions;
+
+  const AdminScaffold({
+    super.key,
+    required this.title,
+    required this.body,
+    required this.activeRoute,
+    this.floatingActionButton,
+    this.showSidebar = true,
+    this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
+    final bool isDesktop = screenSize.width > 900;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F7F7), // Soft background for admin
+      appBar: !isDesktop
+          ? AppBar(
+              title: Text(title,
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black87,
+              elevation: 0,
+              iconTheme: const IconThemeData(color: Colors.black87),
+              actions: actions,
+            )
+          : null, // No AppBar on desktop, we use the sidebar headers
+      drawer: !isDesktop
+          ? _AdminSidebar(isMobile: true, activeRoute: activeRoute)
+          : null,
+      body: Row(
+        children: [
+          // Desktop Sidebar
+          if (isDesktop && showSidebar)
+            SizedBox(
+              width: 250,
+              child: _AdminSidebar(isMobile: false, activeRoute: activeRoute),
+            ),
+
+          // Main Content
+          Expanded(
+            child: Column(
+              children: [
+                if (isDesktop)
+                  Container(
+                    height: 80,
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    color: Colors.white,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(title,
+                            style: GoogleFonts.outfit(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87)),
+                        Row(
+                          children: [
+                            if (actions != null) ...actions!,
+                            const SizedBox(width: 16),
+                            IconButton(
+                                onPressed: () {},
+                                icon: const Icon(LucideIcons.bell,
+                                    color: Colors.grey)),
+                            const SizedBox(width: 16),
+                            const CircleAvatar(
+                              backgroundColor: Colors.red,
+                              child: Text("A",
+                                  style: TextStyle(color: Colors.white)),
+                            )
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                Expanded(child: body),
+              ],
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: floatingActionButton,
+    );
+  }
+}
+
+class _AdminSidebar extends StatelessWidget {
+  final bool isMobile;
+  final String activeRoute;
+
+  const _AdminSidebar({required this.isMobile, required this.activeRoute});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white, // White sidebar
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Logo Area
+            Container(
+              height: isMobile ? 150 : 80,
+              alignment: isMobile ? Alignment.center : Alignment.centerLeft,
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: isMobile
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.start,
+                children: [
+                  Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFEA1D2C),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(LucideIcons.zap,
+                          color: Colors.white, size: 20)),
+                  const SizedBox(width: 12),
+                  Text("Manda.AI",
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w800, fontSize: 22)),
+                ],
+              ),
+            ),
+
+            if (isMobile) const Divider(),
+
+            // Menu Items
+            Expanded(
+              child: ListView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                children: [
+                  _buildMenuItem(
+                      context,
+                      'Dashboard',
+                      LucideIcons.layoutDashboard,
+                      '/admin-dashboard',
+                      activeRoute == '/admin-dashboard'),
+                  _buildMenuItem(context, 'Pedidos', LucideIcons.shoppingBag,
+                      '/admin-orders', activeRoute == '/admin-orders'),
+                  _buildMenuItem(context, 'Produtos', LucideIcons.utensils,
+                      '/admin-products', activeRoute == '/admin-products'),
+                  _buildMenuItem(context, 'Vendas', LucideIcons.barChart2,
+                      '/admin-sales', activeRoute == '/admin-sales'),
+                  const Divider(height: 32),
+                  _buildMenuItem(context, 'Cozinha (KDS)', LucideIcons.monitor,
+                      '/kitchen', activeRoute == '/kitchen'),
+                  _buildMenuItem(context, 'Configurações', LucideIcons.settings,
+                      '/settings', activeRoute == '/settings'),
+                ],
+              ),
+            ),
+
+            // Logout
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildMenuItem(
+                  context, 'Sair', LucideIcons.logOut, '/logout', false,
+                  isLogout: true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(BuildContext context, String title, IconData icon,
+      String route, bool isActive,
+      {bool isLogout = false}) {
+    return ListTile(
+      leading: Icon(icon,
+          color: isLogout
+              ? Colors.red
+              : (isActive ? const Color(0xFFEA1D2C) : Colors.grey[600])),
+      title: Text(title,
+          style: GoogleFonts.inter(
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              color: isLogout
+                  ? Colors.red
+                  : (isActive ? const Color(0xFFEA1D2C) : Colors.black87))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      tileColor: isActive
+          ? const Color(0xFFEA1D2C).withOpacity(0.08)
+          : Colors.transparent,
+      onTap: () async {
+        if (isActive) {
+          if (isMobile) {
+            Navigator.pop(context); // Close drawer if already on page
+          }
+          return;
+        }
+
+        if (isLogout) {
+          await Supabase.instance.client.auth.signOut();
+          if (context.mounted) {
+            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+          }
+          return;
+        }
+
+        Widget? page;
+        switch (route) {
+          case '/admin-dashboard':
+            page = const AdminDashboardScreen();
+            break;
+          case '/admin-orders':
+            page =
+                const AdminOrdersScreen(); // Needs AdminScaffold wrapper update
+            break;
+          case '/admin-products':
+            page =
+                const AdminProductsScreen(); // Needs AdminScaffold wrapper update
+            break;
+          case '/admin-sales':
+            page =
+                const AdminSalesScreen(); // Needs AdminScaffold wrapper update check
+            break;
+          case '/kitchen':
+            page = const KitchenScreen();
+            break;
+        }
+
+        if (page != null) {
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (_) => page!));
+        }
+      },
+    );
+  }
+}

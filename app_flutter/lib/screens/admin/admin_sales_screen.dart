@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
 import '../../constants/api.dart';
+import '../../widgets/admin/admin_scaffold.dart';
 
 class AdminSalesScreen extends StatefulWidget {
   const AdminSalesScreen({super.key});
@@ -108,8 +109,9 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = Theme.of(context).textTheme.titleMedium?.color;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return AdminScaffold(
+      title: AppTranslations.of(context, 'salesActivity'),
+      activeRoute: '/admin-sales',
       body: Stack(
         children: [
           // 1. Teal Gradient Header Background
@@ -129,134 +131,109 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
             ),
           ),
 
-          SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Custom App Bar
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon:
-                              const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        Text(
-                          AppTranslations.of(context, 'salesActivity'),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 20), // Top spacing inside body
+
+                // 2. Three Gauges (KPIs)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildGaugeItem(
+                          AppTranslations.of(context, 'orders').toUpperCase(),
+                          _totalOrders.toString(),
+                          _totalOrders / 50.0), // Mock max goal 50
+                      _buildGaugeItem(
+                          AppTranslations.of(context, 'revenue').toUpperCase(),
+                          "€${_totalRevenue.toStringAsFixed(0)}",
+                          (_totalRevenue / 500.0)
+                              .clamp(0.0, 1.0)), // Mock max goal 500
+                      _buildGaugeItem(
+                          AppTranslations.of(context, 'avgTicket')
+                              .toUpperCase(),
+                          "€${_avgTicket.toStringAsFixed(1)}",
+                          (_avgTicket / 20.0).clamp(0.0, 1.0)),
+                    ],
                   ),
+                ),
 
-                  const SizedBox(height: 20),
+                const SizedBox(height: 30),
 
-                  // 2. Three Gauges (KPIs)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildGaugeItem(
-                            AppTranslations.of(context, 'orders').toUpperCase(),
-                            _totalOrders.toString(),
-                            _totalOrders / 50.0), // Mock max goal 50
-                        _buildGaugeItem(
-                            AppTranslations.of(context, 'revenue')
-                                .toUpperCase(),
-                            "€${_totalRevenue.toStringAsFixed(0)}",
-                            (_totalRevenue / 500.0)
-                                .clamp(0.0, 1.0)), // Mock max goal 500
-                        _buildGaugeItem(
-                            AppTranslations.of(context, 'avgTicket')
-                                .toUpperCase(),
-                            "€${_avgTicket.toStringAsFixed(1)}",
-                            (_avgTicket / 20.0).clamp(0.0, 1.0)),
-                      ],
-                    ),
+                // 3. Floating Card Container
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    // Dynamic Card Color
+                    color: Theme.of(context).cardTheme.color,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top Products Title
+                      Text(
+                        AppTranslations.of(context, 'topProducts'),
+                        style: TextStyle(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16),
+                      ),
+                      const SizedBox(height: 10),
 
-                  const SizedBox(height: 30),
+                      // Top Products Table
+                      _buildTopProductsTable(),
 
-                  // 3. Floating Card Container
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      // Dynamic Card Color
-                      color: Theme.of(context).cardTheme.color,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Top Products Title
-                        Text(
-                          AppTranslations.of(context, 'topProducts'),
-                          style: TextStyle(
-                              color: textColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
-                        ),
-                        const SizedBox(height: 10),
+                      const SizedBox(height: 30),
 
-                        // Top Products Table
-                        _buildTopProductsTable(),
+                      // Line Chart Title & Legend
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            AppTranslations.of(context, 'salesTrend'),
+                            style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16),
+                          ),
+                          _buildPeriodSelector(),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
 
-                        const SizedBox(height: 30),
-
-                        // Line Chart Title & Legend
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              AppTranslations.of(context, 'salesTrend'),
-                              style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
-                            ),
-                            _buildPeriodSelector(),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Line Chart
-                        SizedBox(
-                          height: 250,
-                          child: _loading
-                              ? const Center(child: CircularProgressIndicator())
-                              : _chartData.isEmpty
-                                  ? Center(
-                                      child: Text(
-                                          AppTranslations.of(context, 'noData'),
-                                          style: TextStyle(color: textColor)))
-                                  : LineChart(_mainLineData()),
-                        ),
-                      ],
-                    ),
+                      // Line Chart
+                      SizedBox(
+                        height: 250,
+                        child: _loading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _chartData.isEmpty
+                                ? Center(
+                                    child: Text(
+                                        AppTranslations.of(context, 'noData'),
+                                        style: TextStyle(color: textColor)))
+                                : LineChart(_mainLineData()),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 30),
-                ],
-              ),
+                ),
+                const SizedBox(height: 30),
+              ],
             ),
           ),
         ],
-      ),
-    );
+      ), // Stack
+    ); // AdminScaffold
   }
 
   // --- Gauge Widget Helper ---
@@ -323,9 +300,10 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
     final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     if (_loading) return const Center(child: LinearProgressIndicator());
-    if (_topProducts.isEmpty)
+    if (_topProducts.isEmpty) {
       return Text(AppTranslations.of(context, 'noSalesYet'),
           style: TextStyle(color: textColor));
+    }
 
     return Column(
       children: _topProducts.asMap().entries.map((entry) {
@@ -416,9 +394,9 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
             },
           ),
         ),
-        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
       borderData: FlBorderData(show: false),
       lineBarsData: [
@@ -429,7 +407,7 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
               colors: [Color(0xFF11998e), Color(0xFF38ef7d)]),
           barWidth: 3,
           isStrokeCapRound: true,
-          dotData: FlDotData(show: true),
+          dotData: const FlDotData(show: true),
           belowBarData: BarAreaData(
             show: true,
             gradient: LinearGradient(

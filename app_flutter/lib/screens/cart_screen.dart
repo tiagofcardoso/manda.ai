@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/cart_service.dart';
@@ -179,6 +178,7 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
         final payload = {
           "table_id": tableId,
           "total": widget.cartService.totalAmount,
+          "user_id": user?.id, // Includes User ID if logged in
           "items": widget.cartService.items
               .map((item) => {
                     "product_id": item.product.id,

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../services/admin_service.dart';
 import '../../services/app_translations.dart';
 import '../../utils/image_helper.dart';
+import '../../widgets/admin/admin_scaffold.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -175,38 +176,24 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return AdminScaffold(
+      title: AppTranslations.of(context, 'orders'),
+      activeRoute: '/admin-orders',
+      actions: [
+        IconButton(
+          icon: const Icon(LucideIcons.refreshCw),
+          onPressed: _loadOrders,
+        ),
+      ],
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 120.0,
-            floating: false,
-            pinned: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            foregroundColor: textColor,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                AppTranslations.of(context, 'orders'),
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              centerTitle: false,
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(LucideIcons.refreshCw),
-                onPressed: _loadOrders,
-              ),
-            ],
-          ),
+          // Remove SliverAppBar as AdminScaffold handles the header
+
           // Search Bar
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding:
+                  const EdgeInsets.fromLTRB(16, 24, 16, 8), // Added top padding
               child: TextField(
                 style: TextStyle(color: textColor),
                 decoration: InputDecoration(
@@ -488,7 +475,7 @@ class _OrderCard extends StatelessWidget {
                     const Spacer(),
                     Text(
                       NumberFormat.currency(symbol: '€').format(total),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.green,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -598,7 +585,7 @@ class _OrderDetailSheet extends StatelessWidget {
                                     item['notes'].toString().isNotEmpty)
                                   Text(
                                     item['notes'],
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: Colors.orange,
                                       fontSize: 12,
                                       fontStyle: FontStyle.italic,

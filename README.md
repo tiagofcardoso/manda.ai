@@ -59,19 +59,27 @@ The Python server handles specific business logic and integrations.
 cd server_python
 pip install -r requirements.txt
 # Create a .env file with SUPABASE_URL and SUPABASE_KEY
-uvicorn main:app --reload --host 0.0.0.0
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. Mobile/Web App (Flutter)
-Run the main application for any role (Client/Driver/Admin).
+### 3. Web App (Admin/Landing)
+Run the Flutter application in Chrome for the web experience.
+```bash
+cd app_flutter
+flutter run -d chrome
+```
+
+### 4. Mobile App (Client/Driver)
+Run the main application on a connected device or emulator.
 ```bash
 cd app_flutter
 flutter run
+# Select your Android/iOS device from the list
 ```
 
-### 4. Admin Web Panel (Next.js)
-*Optional: If using the Next.js specific dashboard.*
+### 5. Admin Web Panel (Legacy/Next.js)
+*Optional: If using the older Next.js dashboard.*
 ```bash
-cd web_nextjs
+web_nextjs
 npm run dev
 ```

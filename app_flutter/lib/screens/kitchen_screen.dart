@@ -6,10 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:convert';
+import 'dart:async';
 import '../services/app_translations.dart';
 import '../utils/image_helper.dart';
 import '../constants/api.dart';
-import '../widgets/app_drawer.dart';
+
+import '../widgets/admin/admin_scaffold.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -24,15 +26,36 @@ class _KitchenScreenState extends State<KitchenScreen> {
   final _audioPlayer = AudioPlayer();
   bool _isSoundEnabled = true;
 
+  List<Map<String, dynamic>> _orders = [];
+  bool _isLoadingOrders = true;
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
     _setupRealtimeSubscription();
+    _loadOrders(); // Initial Load
+
+    // Polling fallback to ensure reliability (every 1s)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) _loadOrders(silent: true);
+    });
+
+    // Listen for Auth Changes to re-subscribe if needed
+    _supabase.auth.onAuthStateChange.listen((data) {
+      if (data.session != null) {
+        print("Kitchen: Auth changed (Signed In), re-subscribing...");
+        _subscription?.unsubscribe();
+        _setupRealtimeSubscription();
+        _loadOrders();
+      }
+    });
   }
 
   @override
   void dispose() {
     _subscription?.unsubscribe();
+    _refreshTimer?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -55,7 +78,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
             print("Kitchen: Change detected! Refreshing...");
             // When a change happens, refresh the list via Backend
             if (mounted) {
-              setState(() {});
+              _loadOrders(silent: true); // Refresh data
 
               if (payload.eventType == PostgresChangeEvent.insert) {
                 if (_isSoundEnabled) {
@@ -88,14 +111,17 @@ class _KitchenScreenState extends State<KitchenScreen> {
   }
 
   // Fetch active orders (pending, prep) via BACKEND API (Bypasses RLS)
-  Future<List<Map<String, dynamic>>> _fetchActiveOrders() async {
+  Future<void> _loadOrders({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _isLoadingOrders = true);
+
     try {
       final session = _supabase.auth.currentSession;
       final token = session?.accessToken;
 
       if (token == null) {
         debugPrint('Kitchen: No Active Session!');
-        return [];
+        if (mounted) setState(() => _isLoadingOrders = false);
+        return;
       }
 
       final response = await http.get(
@@ -108,15 +134,36 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        return List<Map<String, dynamic>>.from(data);
+        final newOrders = List<Map<String, dynamic>>.from(data);
+
+        // Play sound if new orders detected during silent refresh
+        if (silent && mounted && _isSoundEnabled) {
+          final oldIds = _orders.map((e) => e['id']).toSet();
+          final hasNew = newOrders.any((o) => !oldIds.contains(o['id']));
+          if (hasNew) {
+            _playNotificationSound();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(
+                      AppTranslations.of(context, 'newOrderNotification'))),
+            );
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _orders = newOrders;
+            _isLoadingOrders = false;
+          });
+        }
       } else {
         debugPrint(
             'Error fetching orders: ${response.statusCode} ${response.body}');
-        return [];
+        if (mounted) setState(() => _isLoadingOrders = false);
       }
     } catch (e) {
       debugPrint('Error fetching orders: $e');
-      return [];
+      if (mounted) setState(() => _isLoadingOrders = false);
     }
   }
 
@@ -153,8 +200,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
                 content: Text(
                     '${AppTranslations.of(context, 'orderUpdated')} $newStatus!')),
           );
-          // Subscription will trigger refresh, but we can optimistically fetch too
-          setState(() {});
+          // Refresh list immediately
+          _loadOrders(silent: true);
         }
       } else {
         throw Exception('Failed: ${response.body}');
@@ -183,7 +230,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
         password: _passwordController.text.trim(),
       );
       if (mounted) {
-        setState(() {}); // Rebuild to show orders
+        _loadOrders(); // Load orders after sign in
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -210,7 +257,11 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
   Future<void> _signOut() async {
     await _supabase.auth.signOut();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _orders = [];
+      });
+    }
   }
 
   @override
@@ -251,9 +302,9 @@ class _KitchenScreenState extends State<KitchenScreen> {
                             borderSide:
                                 BorderSide(color: textColor!.withOpacity(0.3))),
                         focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: textColor!)),
+                            borderSide: BorderSide(color: textColor)),
                         prefixIcon: Icon(LucideIcons.mail,
-                            color: textColor?.withOpacity(0.5)),
+                            color: textColor.withOpacity(0.5)),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -264,14 +315,14 @@ class _KitchenScreenState extends State<KitchenScreen> {
                       decoration: InputDecoration(
                         labelText: AppTranslations.of(context, 'password'),
                         labelStyle:
-                            TextStyle(color: textColor?.withOpacity(0.7)),
+                            TextStyle(color: textColor.withOpacity(0.7)),
                         enabledBorder: OutlineInputBorder(
                             borderSide:
-                                BorderSide(color: textColor!.withOpacity(0.3))),
+                                BorderSide(color: textColor.withOpacity(0.3))),
                         focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: textColor!)),
+                            borderSide: BorderSide(color: textColor)),
                         prefixIcon: Icon(LucideIcons.lock,
-                            color: textColor?.withOpacity(0.5)),
+                            color: textColor.withOpacity(0.5)),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -299,88 +350,65 @@ class _KitchenScreenState extends State<KitchenScreen> {
       );
     }
 
-    return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        title: Text(AppTranslations.of(context, 'kitchenDisplayTitle'),
-            style: TextStyle(color: textColor)),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: textColor,
-        actions: [
-          IconButton(
-            icon:
-                Icon(_isSoundEnabled ? LucideIcons.bell : LucideIcons.bellOff),
-            color: _isSoundEnabled ? Colors.amber : Colors.grey,
-            onPressed: () {
-              setState(() {
-                _isSoundEnabled = !_isSoundEnabled;
-              });
-              if (_isSoundEnabled) {
-                _playNotificationSound(); // Preview sound
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.refreshCw),
-            onPressed: () => setState(() {}),
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.logOut),
-            onPressed: _signOut,
-          )
-        ],
-      ),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _fetchActiveOrders(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-                child: Text('Error: ${snapshot.error}',
-                    style: TextStyle(color: textColor)));
-          }
-
-          final orders = snapshot.data ?? [];
-
-          if (orders.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(LucideIcons.checkCircle,
-                      size: 64,
-                      color: isDark ? Colors.greenAccent : Colors.green),
-                  const SizedBox(height: 16),
-                  Text(AppTranslations.of(context, 'noOrdersKitchen'),
-                      style: TextStyle(
-                          color: textColor?.withOpacity(0.7), fontSize: 18)),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return _OrderCard(
-                order: order,
-                onAdvance: () {
-                  final currentStatus = order['status'];
-                  final nextStatus =
-                      currentStatus == 'pending' ? 'prep' : 'ready';
-                  _updateStatus(order['id'], nextStatus);
-                },
-              );
-            },
-          );
-        },
-      ),
+    return AdminScaffold(
+      title: AppTranslations.of(context, 'kitchenDisplayTitle'),
+      activeRoute: '/kitchen',
+      actions: [
+        IconButton(
+          icon: Icon(_isSoundEnabled ? LucideIcons.bell : LucideIcons.bellOff),
+          color: _isSoundEnabled ? Colors.amber : Colors.grey,
+          onPressed: () {
+            setState(() {
+              _isSoundEnabled = !_isSoundEnabled;
+            });
+            if (_isSoundEnabled) {
+              _playNotificationSound(); // Preview sound
+            }
+          },
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.refreshCw),
+          onPressed: () => _loadOrders(),
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.logOut),
+          onPressed: _signOut,
+        )
+      ],
+      body: _isLoadingOrders
+          ? const Center(child: CircularProgressIndicator())
+          : _orders.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(LucideIcons.checkCircle,
+                          size: 64,
+                          color: isDark ? Colors.greenAccent : Colors.green),
+                      const SizedBox(height: 16),
+                      Text(AppTranslations.of(context, 'noOrdersKitchen'),
+                          style: TextStyle(
+                              color: textColor?.withOpacity(0.7),
+                              fontSize: 18)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _orders.length,
+                  itemBuilder: (context, index) {
+                    final order = _orders[index];
+                    return _OrderCard(
+                      order: order,
+                      onAdvance: () {
+                        final currentStatus = order['status'];
+                        final nextStatus =
+                            currentStatus == 'pending' ? 'prep' : 'ready';
+                        _updateStatus(order['id'], nextStatus);
+                      },
+                    );
+                  },
+                ),
     );
   }
 }

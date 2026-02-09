@@ -24,7 +24,7 @@ class TableOrderRequest(BaseModel):
     table_id: str
     items: list
     total: float
-    # No user_id or address required for Table/Guest
+    user_id: str | None = None # Optional for logged-in users
 
 class DeliveryOrderRequest(BaseModel):
     items: list
@@ -75,7 +75,7 @@ def place_table_order(order: TableOrderRequest):
         "order_type": "dine_in", # Explicit Flag
         "total_amount": order.total,
         "status": "pending",
-        # user_id is null for guests
+        "user_id": order.user_id # Can be null or user_id
     }
     
     new_order = supabase.table("orders").insert(order_data).execute()

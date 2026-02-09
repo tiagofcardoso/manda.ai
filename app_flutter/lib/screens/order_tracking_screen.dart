@@ -34,6 +34,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   Map<String, dynamic>? _orderData;
   StreamSubscription<Position>?
       _positionStreamSubscription; // For broadcasting location
+  Timer? _pollingTimer; // [NEW] Polling Fallback
 
   // Map Variables
   final MapController _mapController = MapController();
@@ -107,6 +108,57 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       if (role == 'driver') {
         _startLocationBroadcasting();
       }
+
+      // Start Polling Fallback (1s)
+      _startPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _pollOrderStatus();
+    });
+  }
+
+  Future<void> _pollOrderStatus() async {
+    if (_activeOrderId == null) return;
+    try {
+      final response = await _supabase
+          .from('orders')
+          .select()
+          .eq('id', _activeOrderId!)
+          .maybeSingle();
+
+      if (response != null && mounted) {
+        final newStatus = response['status'];
+        // Update if status changed or data refreshed
+        if (newStatus != _currentStatus || _orderData == null) {
+          print("Polling: Status updated to $newStatus");
+          setState(() {
+            _orderData = response;
+            _currentStatus = newStatus;
+          });
+
+          // Handle Auto-Close
+          if (newStatus == 'delivered') {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                OrderService().clearOrder();
+                setState(() => _activeOrderId = null);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Order Completed! 🌟'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Polling Error: $e");
     }
   }
 
@@ -277,7 +329,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
 
     // 2. Start Stream
-    final locationSettings = LocationSettings(
+    const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 10, // Update every 10 meters
     );
@@ -352,6 +404,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
+    _pollingTimer?.cancel();
     OrderService().currentOrderIdNotifier.removeListener(_onOrderServiceChange);
     _subscription?.unsubscribe();
     super.dispose();
@@ -374,7 +427,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   Future<void> _fetchInitialStatus() async {
     if (_activeOrderId == null) return;
-    print('Tracking Order ID: ${_activeOrderId}');
+    print('Tracking Order ID: $_activeOrderId');
     _orderStream = _supabase
         .from('orders')
         .stream(primaryKey: ['id'])
@@ -610,7 +663,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                         width: 50,
                                         height: 50,
                                         child: Container(
-                                          decoration: BoxDecoration(
+                                          decoration: const BoxDecoration(
                                               color: Colors.white,
                                               shape: BoxShape.circle,
                                               boxShadow: [
@@ -675,10 +728,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                           color: Colors.black26,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12))),
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(12))),
                       child: Column(children: [
                         const Icon(LucideIcons.armchair,
                             size: 48, color: Colors.white54),

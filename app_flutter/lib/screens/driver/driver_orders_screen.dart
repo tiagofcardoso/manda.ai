@@ -376,10 +376,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
         final deliveries = snapshot.data ?? [];
 
         if (deliveries.isEmpty) {
-          return Center(
+          return const Center(
               child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(LucideIcons.packageCheck, size: 64, color: Colors.grey),
               SizedBox(height: 16),
               Text('No active deliveries.',
@@ -410,10 +410,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
         final deliveries = snapshot.data ?? [];
 
         if (deliveries.isEmpty) {
-          return Center(
+          return const Center(
               child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(LucideIcons.checkCircle, size: 64, color: Colors.grey),
               SizedBox(height: 16),
               Text('No new requests available.',
@@ -548,7 +548,7 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                       const Divider(),
                     ],
                   ),

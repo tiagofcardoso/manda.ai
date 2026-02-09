@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
@@ -162,8 +163,8 @@ class _AppDrawerState extends State<AppDrawer> {
                           onTap: () => _navigateTo(const ClientOrdersScreen()),
                         ),
 
-                      // Scan QR (Clients Only)
-                      if (_role == 'client' || _role == null)
+                      // Scan QR (Clients Only) - Mobile Only
+                      if ((_role == 'client' || _role == null) && !kIsWeb)
                         ListTile(
                           leading: const Icon(LucideIcons.qrCode),
                           title: Text(AppTranslations.of(context, 'scanTable')),

@@ -89,10 +89,8 @@ class _LandingScreenState extends State<LandingScreen> {
         color: _isScrolled ? Colors.white : Colors.transparent,
         boxShadow: _isScrolled
             ? [
-                BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: const Offset(0, 2))
+                const BoxShadow(
+                    color: Colors.black12, blurRadius: 10, offset: Offset(0, 2))
               ]
             : null,
       ),
@@ -157,7 +155,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: () => Navigator.pushNamed(context, '/login'),
+                  onPressed: () => Navigator.pushNamed(context, '/admin'),
                   child: Text(AppTranslations.of(context, 'login'),
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),

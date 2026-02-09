@@ -256,7 +256,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                           ? Colors.amber
                                           : Colors.white54),
                                   value: _isDriver,
-                                  activeColor: Colors.amber,
+                                  activeThumbColor: Colors.amber,
                                   activeTrackColor:
                                       Colors.amber.withOpacity(0.3),
                                   onChanged: (val) {
@@ -399,9 +399,8 @@ class _SignUpScreenState extends State<SignUpScreen>
                                     foregroundColor: Colors.white70),
                                 child: RichText(
                                   text: TextSpan(
-                                    text: AppTranslations.of(
-                                            context, 'alreadyHaveAccount') +
-                                        ' ',
+                                    text: '${AppTranslations.of(
+                                            context, 'alreadyHaveAccount')} ',
                                     style:
                                         const TextStyle(color: Colors.white60),
                                     children: [
@@ -457,8 +456,9 @@ class _SignUpScreenState extends State<SignUpScreen>
         cursorColor: _isDriver ? Colors.amber : Colors.blue,
         validator: required
             ? (value) {
-                if (value == null || value.isEmpty)
+                if (value == null || value.isEmpty) {
                   return AppTranslations.of(context, 'requiredField');
+                }
                 return null;
               }
             : null,

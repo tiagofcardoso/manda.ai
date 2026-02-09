@@ -52,13 +52,11 @@ class _ScanScreenState extends State<ScanScreen> {
             .maybeSingle();
 
         // Try exact match "5"
-        if (response == null) {
-          response = await _supabase
+        response ??= await _supabase
               .from('tables')
               .select('table_number, id')
               .eq('table_number', code)
               .maybeSingle();
-        }
       }
 
       if (response == null) {

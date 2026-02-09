@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Import kIsWeb
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
@@ -19,7 +20,7 @@ import 'client_orders_screen.dart'; // Import Client Orders
 import 'scan_screen.dart';
 import '../constants/categories.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:flutter/services.dart'; // For barcode scanner usually, but using mock for now or simple dialog logic
+// For barcode scanner usually, but using mock for now or simple dialog logic
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -200,7 +201,7 @@ class _MenuScreenState extends State<MenuScreen> {
               onTap: () => Navigator.pop(context),
             ),
 
-            if (!isTableMode)
+            if (!isTableMode && !kIsWeb)
               ListTile(
                 leading: Icon(LucideIcons.qrCode,
                     color: isDark ? Colors.white : Colors.black),

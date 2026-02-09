@@ -1,194 +1,214 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/app_translations.dart';
 import 'admin_products_screen.dart';
 import 'admin_sales_screen.dart';
-
-import '../../widgets/app_drawer.dart';
 import 'admin_orders_screen.dart';
 import '../kitchen_screen.dart';
+
+import '../../widgets/admin/admin_scaffold.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const AppDrawer(),
-      appBar: AppBar(
-        title: Text(AppTranslations.of(context, 'adminDashboard')),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.logOut),
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-              if (context.mounted) Navigator.pop(context);
-            },
-          )
-        ],
-      ),
-      body: Container(
-        height: double.infinity,
-        // Remove hardcoded gradient, use Scaffold background from Theme
-        color: Theme.of(context).scaffoldBackgroundColor,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return AdminScaffold(
+      title: AppTranslations.of(context, 'adminDashboard'),
+      activeRoute: '/admin-dashboard',
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Stats Row
+            Row(
               children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(24.0),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white.withOpacity(0.05)
-                        : Colors.black.withOpacity(0.05),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(32),
-                      bottomRight: Radius.circular(32),
-                    ),
-                  ),
-                  width: double.infinity,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppTranslations.of(context, 'welcomeBack'),
-                        style: TextStyle(
-                            color: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.color, // Adaptive
-                            fontSize: 16),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppTranslations.of(context, 'managerArea'),
-                        style: TextStyle(
-                          color: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.color, // Adaptive
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    "Vendas Hoje",
+                    "R\$ 1.250,00",
+                    LucideIcons.dollarSign,
+                    Colors.green,
                   ),
                 ),
-
-                const SizedBox(height: 32),
-
-                // Action Grid Title
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Text(
-                    AppTranslations.of(context, 'quickActions'),
-                    style: TextStyle(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.color
-                          ?.withOpacity(0.5),
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    "Pedidos",
+                    "12",
+                    LucideIcons.shoppingBag,
+                    Colors.blue,
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // Actions Grid
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.3,
-                  children: [
-                    _buildActionCard(
+                if (MediaQuery.of(context).size.width > 1200) ...[
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
                       context,
-                      AppTranslations.of(context, 'products'),
-                      'assets/images/icon_products_3d.png',
+                      "Entregas",
+                      "4",
+                      LucideIcons.bike,
                       Colors.orange,
-                      () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  const AdminProductsScreen())),
                     ),
-                    _buildActionCard(
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
                       context,
-                      AppTranslations.of(context, 'sales'),
-                      'assets/images/icon_sales_3d.png',
-                      Colors.purple,
-                      () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const AdminSalesScreen())),
+                      "Cozinha",
+                      "3",
+                      LucideIcons.chefHat,
+                      Colors.red,
                     ),
-                    _buildActionCard(
+                  ),
+                ]
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // Quick Actions Title
+            Text(
+              AppTranslations.of(context, 'quickActions'),
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Actions Grid
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              // Taller cards on mobile (1.3) vs desktop (1.5) to avoid overflow
+              childAspectRatio:
+                  MediaQuery.of(context).size.width > 600 ? 1.5 : 1.3,
+              children: [
+                _buildActionCard(
+                  context,
+                  AppTranslations.of(context, 'products'),
+                  LucideIcons.utensils,
+                  Colors.orange,
+                  () => Navigator.push(
                       context,
-                      AppTranslations.of(context, 'orders'),
-                      'assets/images/icon_sales_3d.png',
-                      Colors.blue,
-                      () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const AdminOrdersScreen())),
-                    ),
-                    _buildActionCard(
+                      MaterialPageRoute(
+                          builder: (context) => const AdminProductsScreen())),
+                ),
+                _buildActionCard(
+                  context,
+                  AppTranslations.of(context, 'sales'),
+                  LucideIcons.barChart2,
+                  Colors.purple,
+                  () => Navigator.push(
                       context,
-                      AppTranslations.of(context, 'kitchenDisplayTitle'),
-                      'assets/images/icon_products_3d.png',
-                      Colors.deepOrange,
-                      () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const KitchenScreen())),
-                    ),
-                  ],
+                      MaterialPageRoute(
+                          builder: (context) => const AdminSalesScreen())),
+                ),
+                _buildActionCard(
+                  context,
+                  AppTranslations.of(context, 'orders'),
+                  LucideIcons.listOrdered,
+                  Colors.blue,
+                  () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AdminOrdersScreen())),
+                ),
+                _buildActionCard(
+                  context,
+                  AppTranslations.of(context, 'kitchenDisplayTitle'),
+                  LucideIcons.monitor,
+                  Colors.deepOrange,
+                  () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const KitchenScreen())),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildActionCard(BuildContext context, String title, String imagePath,
+  Widget _buildStatCard(BuildContext context, String title, String value,
+      IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              )
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Prevent overflow of long values (e.g. large currency amounts)
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value,
+                style: GoogleFonts.outfit(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(BuildContext context, String title, IconData icon,
       Color accentColor, VoidCallback onTap) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            // Use Theme Card Color
-            color: Theme.of(context).cardTheme.color,
-            borderRadius: BorderRadius.circular(20),
-            // Light border for dark mode, shadow for light mode
-            border: Theme.of(context).brightness == Brightness.dark
-                ? Border.all(color: Colors.white.withOpacity(0.05))
-                : Border.all(color: Colors.black.withOpacity(0.05)),
-            boxShadow: Theme.of(context).brightness == Brightness.light
-                ? [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4))
-                  ]
-                : [],
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4))
+            ],
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -198,19 +218,17 @@ class AdminDashboardScreen extends StatelessWidget {
                   color: accentColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Image.asset(
-                  imagePath,
-                  width: 64,
-                  height: 64,
-                  fit: BoxFit.contain,
-                ),
+                child: Icon(icon, color: accentColor, size: 32),
               ),
               const SizedBox(height: 12),
               Text(
                 title,
-                style: TextStyle(
-                    color: Theme.of(context).textTheme.titleMedium?.color,
-                    fontWeight: FontWeight.bold,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
                     fontSize: 16),
               ),
             ],

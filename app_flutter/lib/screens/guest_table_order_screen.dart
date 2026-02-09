@@ -125,12 +125,12 @@ class _GuestTableOrderScreenState extends State<GuestTableOrderScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(LucideIcons.utensilsCrossed,
+                      const Icon(LucideIcons.utensilsCrossed,
                           size: 64, color: Colors.grey),
                       const SizedBox(height: 16),
                       Text(
                         AppTranslations.of(context, 'noActiveOrders'),
-                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                        style: const TextStyle(fontSize: 18, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -157,8 +157,8 @@ class _GuestTableOrderScreenState extends State<GuestTableOrderScreen> {
                         ),
                         child: Column(
                           children: [
-                            Icon(LucideIcons.utensilsCrossed,
-                                size: 48, color: const Color(0xFFE63946)),
+                            const Icon(LucideIcons.utensilsCrossed,
+                                size: 48, color: Color(0xFFE63946)),
                             const SizedBox(height: 16),
                             Text(
                               _activeOrder!['tables'] != null
@@ -173,7 +173,7 @@ class _GuestTableOrderScreenState extends State<GuestTableOrderScreen> {
                             Text(
                               "#${_activeOrder!['id'].toString().substring(0, 8)}",
                               style:
-                                  TextStyle(fontSize: 16, color: Colors.grey),
+                                  const TextStyle(fontSize: 16, color: Colors.grey),
                             ),
                             const SizedBox(height: 16),
                             Container(
@@ -229,7 +229,7 @@ class _GuestTableOrderScreenState extends State<GuestTableOrderScreen> {
                                     ),
                                     child: Text(
                                       "${qty}x",
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.bold),
                                     ),
                                   ),
@@ -237,7 +237,7 @@ class _GuestTableOrderScreenState extends State<GuestTableOrderScreen> {
                                   Expanded(
                                     child: Text(
                                       pName,
-                                      style: TextStyle(fontSize: 18),
+                                      style: const TextStyle(fontSize: 18),
                                     ),
                                   ),
                                 ],

@@ -96,7 +96,7 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(LucideIcons.shoppingBag,
+                      const Icon(LucideIcons.shoppingBag,
                           size: 64, color: Colors.grey),
                       const SizedBox(height: 16),
                       Text(

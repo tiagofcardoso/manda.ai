@@ -24,7 +24,7 @@ final Map<String, Map<String, dynamic>> APP_CATEGORIES = {
     'label': 'Fast food',
     'en_label': 'Fast Food',
     'icon': LucideIcons.utensils,
-    'color': Color(0xFFE63946),
+    'color': const Color(0xFFE63946),
   },
   'pizza': {
     'id': 'fa7cbd82-c463-47e3-b813-444793a3144a',

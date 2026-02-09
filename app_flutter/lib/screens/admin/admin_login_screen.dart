@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:animate_do/animate_do.dart';
-import 'dart:ui';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/app_translations.dart';
 import 'admin_dashboard_screen.dart';
 import '../../services/auth_service.dart';
@@ -24,6 +24,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   bool _isLoading = false;
   bool _isCheckingSession = true;
 
+  final Color _brandRed = const Color(0xFFEA1D2C);
+
   @override
   void initState() {
     super.initState();
@@ -42,12 +44,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     if (!mounted) return;
 
     if (role == null) {
-      // Error fetching role or no profile found
       if (mounted) setState(() => _isCheckingSession = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: User role not found.')),
       );
-      // Ideally sign out here to prevent stuck state
       await _supabase.auth.signOut();
       return;
     }
@@ -63,15 +63,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         MaterialPageRoute(builder: (context) => const MainScreen()),
       );
     } else {
-      // Assume Admin/Kitchen for any other role (or specifically check)
-      // For better security, explicitly check:
       if (role == 'admin' || role == 'kitchen' || role == 'manager') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
         );
       } else {
-        // Unknown role
         if (mounted) setState(() => _isCheckingSession = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Unknown role: $role')),
@@ -89,7 +86,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         password: _passwordController.text.trim(),
       );
 
-      // Successful login -> Check role and redirect
       if (mounted) {
         await _checkSession();
       }
@@ -119,201 +115,185 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          )),
+      backgroundColor: const Color(0xFFF7F7F7),
       body: Stack(
         children: [
-          // Background
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF0F172A), // Slate 900
-            ),
-          ),
-          // Gradient Orb
+          // Background Decorative Elements
           Positioned(
             top: -100,
             right: -100,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 400,
+              height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [Colors.purple.withOpacity(0.5), Colors.transparent],
-                ),
+                color: _brandRed.withOpacity(0.05),
               ),
             ),
           ),
           Positioned(
-            bottom: -100,
-            left: -100,
+            bottom: -50,
+            left: -50,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 200,
+              height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFFE63946).withOpacity(0.5),
-                    Colors.transparent
-                  ],
-                ),
+                color: Colors.blue.withOpacity(0.05),
               ),
             ),
           ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-              child: Container(color: Colors.transparent),
-            ),
-          ),
 
-          _isCheckingSession
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFFE63946)))
-              : Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
+          Center(
+            child: _isCheckingSession
+                ? CircularProgressIndicator(color: _brandRed)
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
                     child: FadeInUp(
                       duration: const Duration(milliseconds: 600),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
-                            constraints: const BoxConstraints(maxWidth: 400),
-                            padding: const EdgeInsets.all(32.0),
-                            decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: Colors.white10),
-                                boxShadow: const [
-                                  BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 20,
-                                      spreadRadius: 5)
-                                ]),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                FadeInDown(
-                                  delay: const Duration(milliseconds: 200),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE63946)
-                                          .withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(LucideIcons.user,
-                                        size: 40, color: Color(0xFFE63946)),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                Text(
-                                  AppTranslations.of(context, 'adminLogin'),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                TextField(
-                                  controller: _emailController,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    labelText:
-                                        AppTranslations.of(context, 'email'),
-                                    labelStyle:
-                                        const TextStyle(color: Colors.white70),
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.05),
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none),
-                                    prefixIcon: const Icon(LucideIcons.mail,
-                                        color: Colors.white54),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextField(
-                                  controller: _passwordController,
-                                  obscureText: true,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    labelText:
-                                        AppTranslations.of(context, 'password'),
-                                    labelStyle:
-                                        const TextStyle(color: Colors.white70),
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.05),
-                                    border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none),
-                                    prefixIcon: const Icon(LucideIcons.lock,
-                                        color: Colors.white54),
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFE63946),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                      elevation: 0,
-                                    ),
-                                    onPressed: _isLoading ? null : _signIn,
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2))
-                                        : Text(
-                                            AppTranslations.of(
-                                                context, 'loginToAdmin'),
-                                            style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) =>
-                                              const SignUpScreen()),
-                                    );
-                                  },
-                                  child: Text(
-                                    AppTranslations.of(context, 'signUp'),
-                                    style:
-                                        const TextStyle(color: Colors.white70),
-                                  ),
-                                ),
-                              ],
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        padding: const EdgeInsets.all(40),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            )
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Logo
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: _brandRed.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(LucideIcons.zap,
+                                  size: 32, color: _brandRed),
                             ),
-                          ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Manda.AI',
+                              style: GoogleFonts.outfit(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              AppTranslations.of(context, 'adminLogin'),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Inputs
+                            TextField(
+                              controller: _emailController,
+                              style: const TextStyle(color: Colors.black87),
+                              decoration: InputDecoration(
+                                labelText: AppTranslations.of(context, 'email'),
+                                prefixIcon: Icon(LucideIcons.mail,
+                                    size: 20, color: Colors.grey[400]),
+                                filled: true,
+                                fillColor: const Color(0xFFF9FAFB),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 16, horizontal: 16),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _passwordController,
+                              obscureText: true,
+                              style: const TextStyle(color: Colors.black87),
+                              decoration: InputDecoration(
+                                labelText:
+                                    AppTranslations.of(context, 'password'),
+                                prefixIcon: Icon(LucideIcons.lock,
+                                    size: 20, color: Colors.grey[400]),
+                                filled: true,
+                                fillColor: const Color(0xFFF9FAFB),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 16, horizontal: 16),
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _signIn,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _brandRed,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2),
+                                      )
+                                    : Text(
+                                        AppTranslations.of(
+                                            context, 'loginToAdmin'),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SignUpScreen()),
+                                );
+                              },
+                              child: Text(
+                                AppTranslations.of(context, 'signUp'),
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                ),
+          ),
         ],
       ),
     );
