@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'screens/landing_screen.dart' as mobile_landing;
 import 'screens/web/landing_screen.dart' as web_landing;
 import 'screens/admin/admin_login_screen.dart';
+import 'screens/admin/super_admin_dashboard_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
 
 import 'services/theme_service.dart';
 import 'services/locale_service.dart';
 import 'services/cart_service.dart';
 import 'services/order_service.dart';
+import 'services/settings_service.dart';
+import 'constants/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +44,9 @@ Future<void> main() async {
   // Initialize Localization (Saved Pref > Geolocation)
   await LocaleService().init();
 
+  // Initialize Settings (Currency)
+  await SettingsService().loadCurrency();
+
   // Enable Edge-to-Edge UI for premium look
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -60,14 +66,13 @@ class MandaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeService().themeModeNotifier,
-      builder: (context, themeMode, _) {
+      builder: (context, _, __) {
         return ValueListenableBuilder<Locale>(
             valueListenable: LocaleService().localeNotifier,
             builder: (context, locale, _) {
               return MaterialApp(
                 title: 'Manda.AI',
                 debugShowCheckedModeBanner: false,
-                themeMode: themeMode,
                 // Localizations
                 locale: locale,
                 localizationsDelegates: const [
@@ -79,52 +84,20 @@ class MandaApp extends StatelessWidget {
                   Locale('en'), // English
                   Locale('pt'), // Portuguese
                 ],
-                // Themes
-                theme: ThemeData(
-                  colorScheme: ColorScheme.fromSeed(
-                      seedColor: const Color(0xFFE63946),
-                      brightness: Brightness.light),
-                  useMaterial3: true,
-                  scaffoldBackgroundColor: const Color(0xFFF5F5F5),
-                  textTheme: GoogleFonts.interTextTheme(),
-                  appBarTheme: const AppBarTheme(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                  ),
-                  cardTheme: CardThemeData(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    color: Colors.white,
-                  ),
-                ),
-                darkTheme: ThemeData(
-                  colorScheme: ColorScheme.fromSeed(
-                      seedColor: const Color(0xFFE63946),
-                      brightness: Brightness.dark),
-                  useMaterial3: true,
-                  scaffoldBackgroundColor: const Color(0xFF121212),
-                  textTheme: GoogleFonts.interTextTheme().apply(
-                      bodyColor: Colors.white, displayColor: Colors.white),
-                  appBarTheme: const AppBarTheme(
-                    backgroundColor: Color(0xFF1E1E1E),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
-                  cardTheme: CardThemeData(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    color: const Color(0xFF1E1E1E),
-                  ),
-                ),
+
+                ///Themes
+                theme: AppTheme.lightTheme,
+                darkTheme: AppTheme.darkTheme,
+                themeMode: ThemeService().getEffectiveThemeMode(),
                 home: kIsWeb
                     ? const web_landing.LandingScreen()
                     : const mobile_landing.LandingScreen(),
                 routes: {
                   '/login': (context) => const mobile_landing.LandingScreen(),
                   '/admin': (context) => const AdminLoginScreen(),
+                  '/super-admin-dashboard': (context) =>
+                      const SuperAdminDashboardScreen(),
+                  '/admin-dashboard': (context) => const AdminDashboardScreen(),
                 },
               );
             });

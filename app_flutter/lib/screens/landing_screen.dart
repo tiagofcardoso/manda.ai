@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart'; // [NEW] for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'scan_screen.dart';
 import 'admin/admin_login_screen.dart';
+import 'marketplace_screen.dart'; // [NEW]
 import '../services/app_translations.dart';
 import '../services/locale_service.dart';
 
@@ -71,20 +73,49 @@ class LandingScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 1. Scan Button (Primary)
+                    // 1. Scan Button (Primary - Mobile Only)
+                    if (!kIsWeb) ...[
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const ScanScreen()),
+                          );
+                        },
+                        icon: const Icon(LucideIcons.qrCode),
+                        label: Text(AppTranslations.of(context, 'scanTable')),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE63946),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 48, vertical: 16),
+                          textStyle: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // 2. Marketplace / Delivery Button
                     ElevatedButton.icon(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const ScanScreen()),
+                              builder: (context) => const MarketplaceScreen()),
                         );
                       },
-                      icon: const Icon(LucideIcons.qrCode),
-                      label: Text(AppTranslations.of(context, 'scanTable')),
+                      icon: const Icon(LucideIcons.store),
+                      label: const Text("Browse Stores"),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE63946),
-                        foregroundColor: Colors.white,
+                        // On Web, make this the Primary (Red) button since Scan is hidden
+                        backgroundColor:
+                            kIsWeb ? const Color(0xFFE63946) : Colors.white,
+                        foregroundColor: kIsWeb ? Colors.white : Colors.black87,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 48, vertical: 16),
                         textStyle: const TextStyle(
@@ -97,7 +128,7 @@ class LandingScreen extends StatelessWidget {
 
                     const SizedBox(height: 24),
 
-                    // 2. Login Delivery Button (Secondary)
+                    // 3. Login Delivery Button (Secondary)
                     OutlinedButton(
                       onPressed: () {
                         Navigator.push(

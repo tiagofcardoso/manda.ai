@@ -3,10 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../utils/responsive.dart';
 import '../../screens/admin/admin_dashboard_screen.dart';
 import '../../screens/admin/admin_orders_screen.dart';
 import '../../screens/admin/admin_products_screen.dart';
 import '../../screens/admin/admin_sales_screen.dart';
+import '../../screens/admin/admin_settings_screen.dart';
 import '../../screens/kitchen_screen.dart';
 
 class AdminScaffold extends StatelessWidget {
@@ -29,8 +31,13 @@ class AdminScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Size screenSize = MediaQuery.of(context).size;
-    final bool isDesktop = screenSize.width > 900;
+    // Use Responsive helper. Treat Tablet as Mobile (Drawer) for simplicity, or modify Responsive to include specific Sidebar breakpoint.
+    // For now, let's align with the Desktop breakpoint (1200) for standard layout,
+    // OR we can allow Tablets (>= 600) to have sidebar if we rotate?
+    // The previous code used 900. Let's use Responsive.width(context) > 900 for now to minimize regression,
+    // but using the helper class accessing width.
+    final bool isDesktop =
+        Responsive.isDesktop(context) || Responsive.width(context) > 900;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7), // Soft background for admin
@@ -238,6 +245,9 @@ class _AdminSidebar extends StatelessWidget {
             break;
           case '/kitchen':
             page = const KitchenScreen();
+            break;
+          case '/settings':
+            page = const AdminSettingsScreen();
             break;
         }
 

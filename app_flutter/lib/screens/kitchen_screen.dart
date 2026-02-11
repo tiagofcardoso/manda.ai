@@ -12,6 +12,7 @@ import '../utils/image_helper.dart';
 import '../constants/api.dart';
 
 import '../widgets/admin/admin_scaffold.dart';
+import '../utils/responsive.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -294,6 +295,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
                     TextField(
                       controller: _emailController,
                       style: TextStyle(color: textColor),
+                      textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
                         labelText: AppTranslations.of(context, 'email'),
                         labelStyle:
@@ -312,6 +314,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
                       controller: _passwordController,
                       obscureText: true,
                       style: TextStyle(color: textColor),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _signIn(),
                       decoration: InputDecoration(
                         labelText: AppTranslations.of(context, 'password'),
                         labelStyle:
@@ -393,22 +397,45 @@ class _KitchenScreenState extends State<KitchenScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _orders.length,
-                  itemBuilder: (context, index) {
-                    final order = _orders[index];
-                    return _OrderCard(
-                      order: order,
-                      onAdvance: () {
-                        final currentStatus = order['status'];
-                        final nextStatus =
-                            currentStatus == 'pending' ? 'prep' : 'ready';
-                        _updateStatus(order['id'], nextStatus);
+              : !Responsive.isMobile(context)
+                  ? GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 400,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 0.8, // Adjust based on card content
+                      ),
+                      itemCount: _orders.length,
+                      itemBuilder: (context, index) {
+                        return _OrderCard(
+                          order: _orders[index],
+                          onAdvance: () {
+                            final currentStatus = _orders[index]['status'];
+                            final nextStatus =
+                                currentStatus == 'pending' ? 'prep' : 'ready';
+                            _updateStatus(_orders[index]['id'], nextStatus);
+                          },
+                        );
                       },
-                    );
-                  },
-                ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _orders.length,
+                      itemBuilder: (context, index) {
+                        final order = _orders[index];
+                        return _OrderCard(
+                          order: order,
+                          onAdvance: () {
+                            final currentStatus = order['status'];
+                            final nextStatus =
+                                currentStatus == 'pending' ? 'prep' : 'ready';
+                            _updateStatus(order['id'], nextStatus);
+                          },
+                        );
+                      },
+                    ),
     );
   }
 }

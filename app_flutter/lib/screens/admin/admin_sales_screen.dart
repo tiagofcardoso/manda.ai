@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
 import '../../constants/api.dart';
 import '../../widgets/admin/admin_scaffold.dart';
+import '../../utils/responsive.dart';
 
 class AdminSalesScreen extends StatefulWidget {
   const AdminSalesScreen({super.key});
@@ -108,6 +109,7 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = Theme.of(context).textTheme.titleMedium?.color;
+    final isWide = !Responsive.isMobile(context);
 
     return AdminScaffold(
       title: AppTranslations.of(context, 'salesActivity'),
@@ -178,54 +180,121 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
                       )
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Products Title
-                      Text(
-                        AppTranslations.of(context, 'topProducts'),
-                        style: TextStyle(
-                            color: textColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16),
-                      ),
-                      const SizedBox(height: 10),
+                  child: isWide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left Column: Top Products
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    AppTranslations.of(context, 'topProducts'),
+                                    style: TextStyle(
+                                        color: textColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _buildTopProductsTable(),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 32),
+                            // Right Column: Chart
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        AppTranslations.of(
+                                            context, 'salesTrend'),
+                                        style: TextStyle(
+                                            color: textColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16),
+                                      ),
+                                      _buildPeriodSelector(),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    height: 300, // Slightly taller for desktop
+                                    child: _loading
+                                        ? const Center(
+                                            child: CircularProgressIndicator())
+                                        : _chartData.isEmpty
+                                            ? Center(
+                                                child: Text(
+                                                    AppTranslations.of(
+                                                        context, 'noData'),
+                                                    style: TextStyle(
+                                                        color: textColor)))
+                                            : LineChart(_mainLineData()),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Top Products Title
+                            Text(
+                              AppTranslations.of(context, 'topProducts'),
+                              style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
+                            const SizedBox(height: 10),
 
-                      // Top Products Table
-                      _buildTopProductsTable(),
+                            // Top Products Table
+                            _buildTopProductsTable(),
 
-                      const SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
-                      // Line Chart Title & Legend
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            AppTranslations.of(context, 'salesTrend'),
-                            style: TextStyle(
-                                color: textColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                          _buildPeriodSelector(),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                            // Line Chart Title & Legend
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  AppTranslations.of(context, 'salesTrend'),
+                                  style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16),
+                                ),
+                                _buildPeriodSelector(),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
 
-                      // Line Chart
-                      SizedBox(
-                        height: 250,
-                        child: _loading
-                            ? const Center(child: CircularProgressIndicator())
-                            : _chartData.isEmpty
-                                ? Center(
-                                    child: Text(
-                                        AppTranslations.of(context, 'noData'),
-                                        style: TextStyle(color: textColor)))
-                                : LineChart(_mainLineData()),
-                      ),
-                    ],
-                  ),
+                            // Line Chart
+                            SizedBox(
+                              height: 250,
+                              child: _loading
+                                  ? const Center(
+                                      child: CircularProgressIndicator())
+                                  : _chartData.isEmpty
+                                      ? Center(
+                                          child: Text(
+                                              AppTranslations.of(
+                                                  context, 'noData'),
+                                              style:
+                                                  TextStyle(color: textColor)))
+                                      : LineChart(_mainLineData()),
+                            ),
+                          ],
+                        ),
                 ),
                 const SizedBox(height: 30),
               ],
@@ -396,7 +465,8 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
         ),
         leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
       borderData: FlBorderData(show: false),
       lineBarsData: [

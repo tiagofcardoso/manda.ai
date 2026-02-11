@@ -15,6 +15,8 @@ import 'admin_orders_screen.dart';
 import '../kitchen_screen.dart';
 import '../../widgets/admin/admin_scaffold.dart';
 
+import '../../utils/responsive.dart';
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -32,9 +34,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   Timer? _refreshTimer;
 
+  // Super Admin Context
+  bool _isSuperAdmin = false;
+  String? _establishmentName;
+  // String? _establishmentId; // Unused
+
   @override
   void initState() {
     super.initState();
+    _checkSuperAdminContext();
     _fetchStats();
     // Refresh stats every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -81,6 +89,68 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  /// Check if current user is Super Admin with establishment context
+  Future<void> _checkSuperAdminContext() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // Fetch user profile to check role and establishment_id
+      final response = await supabase
+          .from('profiles')
+          .select('role, establishment_id, establishments(name)')
+          .eq('id', userId)
+          .single();
+
+      final role = response['role'];
+      final establishmentId = response['establishment_id'];
+
+      // If super_admin with establishment_id set, they're impersonating
+      if (role == 'super_admin' && establishmentId != null) {
+        if (mounted) {
+          setState(() {
+            _isSuperAdmin = true;
+            // _establishmentId = establishmentId; // Unused
+
+            // Get establishment name
+            if (response['establishments'] != null) {
+              _establishmentName = response['establishments']['name'];
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking super admin context: $e');
+    }
+  }
+
+  /// Exit admin mode and return to Super Admin Dashboard
+  Future<void> _exitAdminMode() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // Clear establishment_id from profile
+      await supabase
+          .from('profiles')
+          .update({'establishment_id': null}).eq('id', userId);
+
+      if (mounted) {
+        // Navigate back to Super Admin Dashboard
+        Navigator.of(context).pushReplacementNamed('/super-admin-dashboard');
+      }
+    } catch (e) {
+      debugPrint('Error exiting admin mode: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currencyFormat =
@@ -89,36 +159,100 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return AdminScaffold(
       title: AppTranslations.of(context, 'adminDashboard'),
       activeRoute: '/admin-dashboard',
+      // Show Super Admin badge and exit button when in impersonation mode
+      actions: _isSuperAdmin
+          ? [
+              // Establishment Badge
+              Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.building2,
+                        size: 16, color: Colors.purple[700]),
+                    const SizedBox(width: 8),
+                    Text(
+                      _establishmentName ?? 'Establishment',
+                      style: GoogleFonts.inter(
+                        color: Colors.purple[700],
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Exit Button
+              Tooltip(
+                message: 'Exit Admin Mode',
+                child: InkWell(
+                  onTap: _exitAdminMode,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.logOut,
+                            size: 18, color: Colors.red[700]),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Exit',
+                          style: GoogleFonts.inter(
+                            color: Colors.red[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+            ]
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    "Vendas Hoje",
-                    _isLoading
-                        ? "..."
-                        : currencyFormat.format(_stats['total_revenue']),
-                    LucideIcons.dollarSign,
-                    Colors.green,
+            // Stats Cards - Responsive Layout
+            if (Responsive.isDesktop(context) ||
+                Responsive.width(context) > 900)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      "Vendas Hoje",
+                      _isLoading
+                          ? "..."
+                          : currencyFormat.format(_stats['total_revenue']),
+                      LucideIcons.dollarSign,
+                      Colors.green,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    "Pedidos",
-                    _isLoading ? "..." : "${_stats['total_orders']}",
-                    LucideIcons.shoppingBag,
-                    Colors.blue,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      "Pedidos",
+                      _isLoading ? "..." : "${_stats['total_orders']}",
+                      LucideIcons.shoppingBag,
+                      Colors.blue,
+                    ),
                   ),
-                ),
-                if (MediaQuery.of(context).size.width > 900) ...[
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildStatCard(
@@ -139,35 +273,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Colors.red,
                     ),
                   ),
-                ]
-              ],
-            ),
-
-            // On smaller screens, show the other 2 cards in a new row
-            if (MediaQuery.of(context).size.width <= 900) ...[
-              const SizedBox(height: 16),
-              Row(children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    "Entregas",
-                    _isLoading ? "..." : "${_stats['delivery_count'] ?? 0}",
-                    LucideIcons.bike,
-                    Colors.orange,
+                ],
+              )
+            else
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          "Vendas Hoje",
+                          _isLoading
+                              ? "..."
+                              : currencyFormat.format(_stats['total_revenue']),
+                          LucideIcons.dollarSign,
+                          Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          "Pedidos",
+                          _isLoading ? "..." : "${_stats['total_orders']}",
+                          LucideIcons.shoppingBag,
+                          Colors.blue,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    "Cozinha (Ativos)",
-                    _isLoading ? "..." : "${_stats['kitchen_count'] ?? 0}",
-                    LucideIcons.chefHat,
-                    Colors.red,
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          "Entregas",
+                          _isLoading
+                              ? "..."
+                              : "${_stats['delivery_count'] ?? 0}",
+                          LucideIcons.bike,
+                          Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          "Cozinha (Ativos)",
+                          _isLoading
+                              ? "..."
+                              : "${_stats['kitchen_count'] ?? 0}",
+                          LucideIcons.chefHat,
+                          Colors.red,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ])
-            ],
+                ],
+              ),
 
             const SizedBox(height: 32),
 
@@ -186,12 +351,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 4 : 2,
+              crossAxisCount: Responsive.isDesktop(context)
+                  ? 4
+                  : 2, // Use Responsive helper
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
               // Taller cards on mobile (1.3) vs desktop (1.5) to avoid overflow
-              childAspectRatio:
-                  MediaQuery.of(context).size.width > 600 ? 1.5 : 1.3,
+              childAspectRatio: Responsive.isMobile(context)
+                  ? 1.3
+                  : 1.5, // Use Responsive helper
               children: [
                 _buildActionCard(
                   context,

@@ -135,12 +135,9 @@ class AuthService {
     if (user == null) return null;
 
     try {
-      final data = await _supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-      return data['role'] as String?;
+      // Call SECURITY DEFINER function (bypasses RLS)
+      final result = await _supabase.rpc('get_my_role');
+      return result as String?;
     } catch (e) {
       debugPrint('Error fetching role: $e');
       return null;

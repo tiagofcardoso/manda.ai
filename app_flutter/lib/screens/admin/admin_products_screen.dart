@@ -6,10 +6,14 @@ import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/product.dart';
 import '../../services/app_translations.dart';
+import '../../services/settings_service.dart';
 import '../../utils/image_helper.dart';
-import 'product_editor_screen.dart';
+import 'product_editor_screen_modern.dart';
 import '../../constants/api.dart';
 import '../../widgets/admin/admin_scaffold.dart';
+import '../../widgets/admin/admin_centered_layout.dart';
+
+import '../../utils/responsive.dart';
 
 class AdminProductsScreen extends StatefulWidget {
   const AdminProductsScreen({super.key});
@@ -20,6 +24,7 @@ class AdminProductsScreen extends StatefulWidget {
 
 class _AdminProductsScreenState extends State<AdminProductsScreen> {
   final _supabase = Supabase.instance.client;
+  final _settingsService = SettingsService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<Product> _allProducts = [];
@@ -31,10 +36,30 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
   }
 
   Future<List<Product>> _fetchProducts() async {
+    // Get current user's establishment_id
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('Not authenticated');
+
+    // Fetch user profile to get establishment_id
+    final profileResponse = await _supabase
+        .from('profiles')
+        .select('establishment_id')
+        .eq('id', userId)
+        .single();
+
+    final establishmentId = profileResponse['establishment_id'] as String?;
+
+    if (establishmentId == null) {
+      throw Exception(
+          'No establishment context. Please select an establishment.');
+    }
+
+    // Fetch products filtered by establishment
     final response = await _supabase
         .from('products')
         .select()
-        .order('name', ascending: true); // Show ALL, not just available
+        .eq('establishment_id', establishmentId) // FILTER BY ESTABLISHMENT
+        .order('name', ascending: true);
 
     final data = response as List<dynamic>;
     _allProducts = data.map((json) => Product.fromJson(json)).toList();
@@ -113,7 +138,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width > 900;
+    final useGridView =
+        !Responsive.isMobile(context); // Grid for Tablet/Desktop
     final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return AdminScaffold(
@@ -123,102 +149,107 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         backgroundColor: const Color(0xFFEA1D2C),
         foregroundColor: Colors.white,
         icon: const Icon(LucideIcons.plus),
-        label: Text(isDesktop ? 'Adicionar Produto' : 'Novo'),
+        label: Text(useGridView ? 'Adicionar Produto' : 'Novo'),
         onPressed: () async {
           await Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => const ProductEditorScreen()),
+                builder: (context) => const ProductEditorScreenModern()),
           );
           setState(() {}); // Refresh on return
         },
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Buscar produtos...',
-                prefixIcon: const Icon(LucideIcons.search, color: Colors.grey),
-                filled: true,
-                fillColor: const Color(0xFFF5F5F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: AdminCenteredLayout(
+        child: Column(
+          children: [
+            // Search Bar
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Buscar produtos...',
+                  prefixIcon:
+                      const Icon(LucideIcons.search, color: Colors.grey),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ),
-          ),
-          Expanded(
-            child: FutureBuilder<List<Product>>(
-              future: _fetchProducts(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    _allProducts.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                      child: Text('Error: ${snapshot.error}',
-                          style: TextStyle(color: textColor)));
-                }
+            Expanded(
+              child: FutureBuilder<List<Product>>(
+                future: _fetchProducts(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      _allProducts.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Error: ${snapshot.error}',
+                            style: TextStyle(color: textColor)));
+                  }
 
-                final products = _filteredProducts;
+                  final products = _filteredProducts;
 
-                if (products.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(LucideIcons.package,
-                            size: 64, color: textColor?.withOpacity(0.3)),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Nenhum produto encontrado',
-                          style: TextStyle(
-                              color: textColor?.withOpacity(0.5), fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+                  if (products.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.package,
+                              size: 64, color: textColor?.withOpacity(0.3)),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Nenhum produto encontrado',
+                            style: TextStyle(
+                                color: textColor?.withOpacity(0.5),
+                                fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
 
-                if (isDesktop) {
-                  // Desktop Grid View
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(24),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 300,
-                      childAspectRatio: 0.75, // Taller cards for product images
-                      crossAxisSpacing: 24,
-                      mainAxisSpacing: 24,
-                    ),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) =>
-                        _buildProductCard(products[index], isDesktop: true),
-                  );
-                } else {
-                  // Mobile List View
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: products.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 16),
-                    itemBuilder: (context, index) =>
-                        _buildProductCard(products[index], isDesktop: false),
-                  );
-                }
-              },
+                  if (useGridView) {
+                    // Desktop Grid View
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(24),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 300,
+                        childAspectRatio:
+                            0.75, // Taller cards for product images
+                        crossAxisSpacing: 24,
+                        mainAxisSpacing: 24,
+                      ),
+                      itemCount: products.length,
+                      itemBuilder: (context, index) =>
+                          _buildProductCard(products[index], isDesktop: true),
+                    );
+                  } else {
+                    // Mobile List View
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: products.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 16),
+                      itemBuilder: (context, index) =>
+                          _buildProductCard(products[index], isDesktop: false),
+                    );
+                  }
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -298,13 +329,20 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      NumberFormat.currency(symbol: product.currency)
-                          .format(product.price),
-                      style: GoogleFonts.inter(
-                          color: const Color(0xFFEA1D2C),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16),
+                    ValueListenableBuilder<String>(
+                      valueListenable: _settingsService.currencyNotifier,
+                      builder: (context, currency, _) {
+                        final symbol =
+                            _settingsService.getCurrencySymbol(currency);
+                        return Text(
+                          NumberFormat.currency(symbol: symbol)
+                              .format(product.price),
+                          style: GoogleFonts.inter(
+                              color: const Color(0xFFEA1D2C),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16),
+                        );
+                      },
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -359,7 +397,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                   context,
                   MaterialPageRoute(
                       builder: (context) =>
-                          ProductEditorScreen(product: product)),
+                          ProductEditorScreenModern(product: product)),
                 );
                 setState(() {});
               }),

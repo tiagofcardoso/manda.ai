@@ -9,7 +9,7 @@ class LocaleService {
   LocaleService._internal();
 
   final ValueNotifier<Locale> localeNotifier =
-      ValueNotifier(const Locale('en'));
+      ValueNotifier(const Locale('pt'));
 
   /// Initialize: Load saved language or check location
   Future<void> init() async {
@@ -75,6 +75,8 @@ class LocaleService {
       }
     } catch (e) {
       debugPrint('Error getting location for language: $e');
+      // Default to Portuguese if location fails
+      setLocale(const Locale('pt'));
     }
   }
 

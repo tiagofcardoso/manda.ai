@@ -283,7 +283,13 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           else
             SliverPadding(
               padding: const EdgeInsets.all(16),
-              sliver: SliverList(
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 400,
+                  mainAxisExtent: 170, // Fixed height for cards
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final order = _filteredOrders[index];
@@ -344,7 +350,7 @@ class _OrderCard extends StatelessWidget {
         : (isDelivery ? 'Delivery' : 'Takeaway');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      // margin: const EdgeInsets.only(bottom: 12), // Handled by GridView spacing
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),

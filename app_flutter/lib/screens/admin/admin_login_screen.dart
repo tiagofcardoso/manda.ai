@@ -3,8 +3,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../constants/app_theme.dart';
 import '../../services/app_translations.dart';
 import 'admin_dashboard_screen.dart';
+import 'super_admin_dashboard_screen.dart'; // [NEW]
 import '../../services/auth_service.dart';
 import '../auth/signup_screen.dart';
 import '../driver/driver_home_screen.dart';
@@ -24,7 +26,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   bool _isLoading = false;
   bool _isCheckingSession = true;
 
-  final Color _brandRed = const Color(0xFFEA1D2C);
+  final Color _brandRed = AppTheme.primaryColor;
 
   @override
   void initState() {
@@ -67,6 +69,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else if (role == 'super_admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const SuperAdminDashboardScreen()),
         );
       } else {
         if (mounted) setState(() => _isCheckingSession = false);
@@ -200,6 +208,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             TextField(
                               controller: _emailController,
                               style: const TextStyle(color: Colors.black87),
+                              textInputAction:
+                                  TextInputAction.next, // Move to next field
                               decoration: InputDecoration(
                                 labelText: AppTranslations.of(context, 'email'),
                                 prefixIcon: Icon(LucideIcons.mail,
@@ -219,6 +229,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                               controller: _passwordController,
                               obscureText: true,
                               style: const TextStyle(color: Colors.black87),
+                              textInputAction:
+                                  TextInputAction.done, // Done action
+                              onSubmitted: (_) => _signIn(), // Submit on Enter
                               decoration: InputDecoration(
                                 labelText:
                                     AppTranslations.of(context, 'password'),

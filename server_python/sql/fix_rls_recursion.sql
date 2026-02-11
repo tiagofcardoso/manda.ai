@@ -1,41 +1,58 @@
 -- =============================================================================
--- FIX RLS RECURSION (INFINITE LOOP)
+-- FIX RLS INFINITE RECURSION
 -- =============================================================================
--- The previous policy caused an infinite loop:
--- "To check if I am admin, look at my profile." -> "To look at my profile, check if I am admin."
--- 
--- SOLUTION: Use a helper function (SECURITY DEFINER) to check admin status safely.
 
--- 1. Create a function that bypasses RLS to check if user is admin
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
+-- PROBLEM:
+-- The policy "Admins can read all profiles" queries the "profiles" table to check the role.
+-- Querying "profiles" triggers the policy again -> Infinite Loop.
+
+-- SOLUTION:
+-- Create a "SECURITY DEFINER" function.
+-- This function runs with "superuser" privileges (bypassing RLS) just to get the role.
+
+-- 1. Create the helper function
+CREATE OR REPLACE FUNCTION public.auth_role()
+RETURNS text AS $$
 BEGIN
-  -- perform a direct check on the profiles table
-  -- Since this function is SECURITY DEFINER, it runs with higher privileges
-  -- and ignores the Row Level Security on the table for this specific check.
-  RETURN EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role = 'admin'
+  -- Returns the role of the current user from public.profiles
+  -- SECURITY DEFINER ensures this runs without triggering RLS on the user
+  RETURN (
+    SELECT role 
+    FROM public.profiles 
+    WHERE id = auth.uid()
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Drop the buggy recursive policies
-DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
+-- 2. Drop the problematic recursive policies
 DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins full access establishments" ON public.establishments;
+DROP POLICY IF EXISTS "Admins full access categories" ON public.categories;
+DROP POLICY IF EXISTS "Admins full access products" ON public.products;
+DROP POLICY IF EXISTS "Admins full access tables" ON public.tables;
 
--- 3. Re-create the Admin policy using the safe function
-CREATE POLICY "Admins can view all profiles" 
-ON public.profiles FOR SELECT 
-USING ( public.is_admin() );
+-- 3. Re-create "Admins can read all profiles" using the safe function
+CREATE POLICY "Admins can read all profiles" ON public.profiles
+  FOR SELECT
+  USING (
+    public.auth_role() IN ('admin', 'super_admin')
+  );
 
--- 4. Ensure the Basic Owner policy still exists
--- (This allows normal users to read their own profile without being admin)
-DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
-CREATE POLICY "Users can read own profile" 
-ON public.profiles FOR SELECT 
-USING (auth.uid() = id);
+-- 4. Update other Admin policies to use the new function (Optimization)
+--    (Optional, but good practice to allow super_admin everywhere)
 
--- 5. Grant execute permission on the function (just in case)
-GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_admin() TO anon; -- (optional)
+CREATE POLICY "Admins full access establishments" ON public.establishments
+  FOR ALL
+  USING (public.auth_role() IN ('admin', 'super_admin'));
+
+CREATE POLICY "Admins full access categories" ON public.categories
+  FOR ALL
+  USING (public.auth_role() IN ('admin', 'super_admin'));
+
+CREATE POLICY "Admins full access products" ON public.products
+  FOR ALL
+  USING (public.auth_role() IN ('admin', 'super_admin'));
+
+CREATE POLICY "Admins full access tables" ON public.tables
+  FOR ALL
+  USING (public.auth_role() IN ('admin', 'super_admin'));

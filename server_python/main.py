@@ -1,9 +1,12 @@
+import json
+import re
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from database import supabase
-from deps import get_current_user, get_current_admin, get_current_driver
+from database import supabase, supabase_admin
+from deps import get_current_user, get_current_admin, get_current_driver, get_current_super_admin
 
 app = FastAPI()
 
@@ -150,23 +153,21 @@ def place_order_legacy(order: dict):
 # --- KDS ENDPOINTS ---
 
 @app.get("/kds/orders")
-def get_kds_orders(user = Depends(get_current_admin)):
+def get_kds_orders(admin = Depends(get_current_admin)):
     """Fetch active orders for the Kitchen Display System (pending or prep). Requires Auth."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
-    
-    # Optional: Check if user belongs to the establishment (future improvement)
-    # est_id = user.user_metadata.get('establishment_id')
 
     try:
-        # Fetch orders with status 'pending' or 'prep'
-        # We fetch related items and products for display
-        response = supabase.table('orders') \
-            .select('*, tables(table_number), order_items(*, products(name))') \
-            .or_('status.eq.pending,status.eq.prep') \
-            .order('created_at', desc=False) \
-            .execute()
-            
+        query = supabase.table('orders').select('*, tables(table_number), order_items(*, products(name))')
+        
+        # Filter by establishment if set
+        if establishment_id:
+            query = query.eq('establishment_id', establishment_id)
+        
+        response = query.or_('status.eq.pending,status.eq.prep').order('created_at', desc=False).execute()
         return response.data
     except Exception as e:
         print(f"Error fetching KDS orders: {e}")
@@ -203,24 +204,22 @@ class ProductRequest(BaseModel):
     is_available: bool = True
 
 @app.post("/admin/products")
-def create_product(product: ProductRequest, user = Depends(get_current_admin)): # Admin only
+def create_product(product: ProductRequest, admin = Depends(get_current_admin)):
     """Create a new product. Admin only."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        # 1. Get Establishment (Mock for now, or use first one)
-        est_res = supabase.table("establishments").select("id").limit(1).execute()
-        est_id = est_res.data[0]['id'] if est_res.data else None
-        
-        if not est_id:
-             raise HTTPException(status_code=400, detail="No establishment found")
+        if not establishment_id:
+            raise HTTPException(status_code=400, detail="No establishment context. Please select an establishment.")
 
         data = product.dict()
-        data['establishment_id'] = est_id
+        data['establishment_id'] = establishment_id
         
-        response = supabase.table("products").insert(data).execute()
-        return {"status": "success", "data": response.data}
+        response = supabase.table('products').insert(data).execute()
+        return response.data[0]
     except Exception as e:
         print(f"Error creating product: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -255,9 +254,52 @@ def delete_product(product_id: str, user = Depends(get_current_admin)): # Admin 
         print(f"Error deleting product: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- ADMIN SETTINGS ---
+
+class CurrencyUpdateRequest(BaseModel):
+    currency: str
+
+@app.patch("/admin/settings/currency")
+def update_currency(request: CurrencyUpdateRequest, admin = Depends(get_current_admin)):
+    """Update establishment currency setting. Admin only."""
+    user, establishment_id = admin  # Unpack admin context
+    
+    print(f"🔄 Currency Update Request: {request.currency}")
+    print(f"👤 User: {user}")
+    print(f"🏢 Establishment ID: {establishment_id}")
+    
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    # Validate currency code (3 uppercase letters)
+    import re
+    if not re.match(r'^[A-Z]{3}$', request.currency):
+        print(f"❌ Invalid currency format: {request.currency}")
+        raise HTTPException(status_code=400, detail="Invalid currency code. Must be 3 uppercase letters (e.g., EUR, USD, BRL)")
+    
+    if not establishment_id:
+        print(f"❌ No establishment assigned")
+        raise HTTPException(status_code=403, detail="No establishment assigned")
+    
+    try:
+        # Update currency in establishments table
+        print(f"💾 Updating establishment {establishment_id} to currency {request.currency}")
+        response = supabase.table('establishments').update({
+            'currency': request.currency
+        }).eq('id', establishment_id).execute()
+        
+        print(f"✅ Currency updated successfully: {response.data}")
+        return {"message": "Currency updated successfully", "currency": request.currency}
+    except Exception as e:
+        print(f"❌ Error updating currency: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/admin/stats/sales")
-def get_sales_stats(period: str = 'daily', user = Depends(get_current_admin)):
+def get_sales_stats(period: str = 'daily', admin = Depends(get_current_admin)):
     """Fetch sales stats aggregated by period (daily, weekly, monthly)."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
@@ -268,7 +310,10 @@ def get_sales_stats(period: str = 'daily', user = Depends(get_current_admin)):
         if period == 'daily':
             # Last 24 hours or "Today"
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            response = supabase.table('orders').select('created_at, total_amount').gte('created_at', start_date.isoformat()).execute()
+            query = supabase.table('orders').select('created_at, total_amount').gte('created_at', start_date.isoformat())
+            if establishment_id:
+                query = query.eq('establishment_id', establishment_id)
+            response = query.execute()
             
             # Aggregate by hour
             hourly_data = {i: 0.0 for i in range(24)}
@@ -328,16 +373,21 @@ def get_sales_stats(period: str = 'daily', user = Depends(get_current_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/stats/top_products")
-def get_top_products(limit: int = 5, user = Depends(get_current_admin)):
+def get_top_products(limit: int = 5, admin = Depends(get_current_admin)):
     """Fetch top selling products based on order_items."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        # Fetch all order items and their related product names
-        # Note: In a real production DB, this should be a SQL view or RPC for performance.
-        # For now, we fetch and aggregate in Python.
-        response = supabase.table('order_items').select('product_id, quantity, products(name, price)').execute()
+        # Fetch order items filtered by establishment through products relationship
+        # First get products for this establishment, then their order items
+        if establishment_id:
+            # Filter by establishment: get order_items where product.establishment_id matches
+            response = supabase.table('order_items').select('product_id, quantity, products!inner(name, price, establishment_id)').eq('products.establishment_id', establishment_id).execute()
+        else:
+            response = supabase.table('order_items').select('product_id, quantity, products(name, price)').execute()
         
         product_sales = {}
         
@@ -371,20 +421,25 @@ def get_admin_orders(
     date_from: str | None = None,
     date_to: str | None = None,
     limit: int = 100,
-    user = Depends(get_current_admin)
+    admin = Depends(get_current_admin)
 ):
     """Fetch all orders with filters. Admin only."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
     try:
         # Build query with joins for related data
-        # Note: Removed profiles join because many orders don't have user_id (guest/table orders)
         query = supabase.table('orders').select(
             '*, order_items(*, products(name, price, image_url)), tables(table_number)'
         )
         
-        # Apply filters
+        # Apply establishment filter
+        if establishment_id:
+            query = query.eq('establishment_id', establishment_id)
+
+        # Apply other filters
         if status:
             query = query.eq('status', status)
         if order_type:
@@ -418,8 +473,10 @@ def get_admin_orders(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/orders/{order_id}")
-def get_admin_order_detail(order_id: str, user = Depends(get_current_admin)):
+def get_admin_order_detail(order_id: str, admin = Depends(get_current_admin)):
     """Get detailed information about a specific order. Admin only."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
@@ -448,8 +505,10 @@ def get_admin_order_detail(order_id: str, user = Depends(get_current_admin)):
         raise HTTPException(status_code=404, detail="Order not found")
 
 @app.get("/admin/stats/today")
-def get_today_stats(user = Depends(get_current_admin)):
+def get_today_stats(admin = Depends(get_current_admin)):
     """Get quick stats for today only."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
@@ -457,45 +516,47 @@ def get_today_stats(user = Depends(get_current_admin)):
         now = datetime.now()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Fetch today's orders
-        response = supabase.table('orders').select('status, total_amount').gte('created_at', start_of_day.isoformat()).execute()
+        query = supabase.table('orders').select('status, total_amount').gte('created_at', start_of_day.isoformat())
         
+        # Filter by establishment if set
+        if establishment_id:
+            query = query.eq('establishment_id', establishment_id)
+        
+        response = query.execute()
         orders = response.data
         total_orders = len(orders)
-        total_revenue = sum(order['total_amount'] for order in orders)
+        total_revenue = sum(float(o.get('total_amount', 0)) for o in orders)
         
         # Count by status
-        active_orders = len([o for o in orders if o['status'] in ['pending', 'prep', 'ready', 'on_way']])
-        completed_orders = len([o for o in orders if o['status'] in ['delivered', 'completed']])
-        
-        # Dashboard Specifics
-        kitchen_count = len([o for o in orders if o['status'] in ['pending', 'prep']])
-        delivery_count = len([o for o in orders if o.get('order_type') == 'delivery'])
-
-        avg_order_value = total_revenue / total_orders if total_orders > 0 else 0.0
+        pending = sum(1 for o in orders if o.get('status') == 'pending')
+        prep = sum(1 for o in orders if o.get('status') == 'prep')
+        ready = sum(1 for o in orders if o.get('status') == 'ready')
+        delivered = sum(1 for o in orders if o.get('status') == 'delivered')
         
         return {
             "total_orders": total_orders,
-            "total_revenue": round(total_revenue, 2),
-            "active_orders": active_orders,
-            "completed_orders": completed_orders,
-            "kitchen_count": kitchen_count,
-            "delivery_count": delivery_count,
-            "avg_order_value": round(avg_order_value, 2)
+            "total_revenue": total_revenue,
+            "delivery_count": delivered,
+            "kitchen_count": pending + prep
         }
     except Exception as e:
         print(f"Error fetching today stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/stats/orders-by-status")
-def get_orders_by_status(user = Depends(get_current_admin)):
+def get_orders_by_status(admin = Depends(get_current_admin)):
     """Get count of orders by status."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
     try:
-        # Fetch all orders (or recent ones)
-        response = supabase.table('orders').select('status').execute()
+        # Fetch orders filtered by establishment
+        query = supabase.table('orders').select('status')
+        if establishment_id:
+            query = query.eq('establishment_id', establishment_id)
+        response = query.execute()
         
         orders = response.data
         status_counts = {}
@@ -517,8 +578,10 @@ class DeliveryRequest(BaseModel):
     driver_id: str | None = None
 
 @app.post("/admin/deliveries/assign")
-def assign_delivery(req: DeliveryRequest, user = Depends(get_current_admin)):
+def assign_delivery(req: DeliveryRequest, admin = Depends(get_current_admin)):
     """Create a delivery. If driver_id/name is missing, it's an OPEN request (Pool)."""
+    user, establishment_id = admin  # Unpack admin context
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
@@ -617,4 +680,290 @@ async def simulate_delivery_endpoint(order_id: str):
         return {"status": "started", "message": f"Simulation started for {order_id}"}
     except Exception as e:
         print(f"Error starting simulation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# ADMIN USER MANAGEMENT
+# ============================================================================
+
+class CreateAdminRequest(BaseModel):
+    email: str
+    establishment_id: str
+    full_name: str | None = None
+    phone_number: str | None = None
+
+@app.post("/admin/create-establishment-admin")
+def create_establishment_admin(
+    request: CreateAdminRequest,
+    user = Depends(get_current_super_admin)
+):
+    """
+    Creates a new admin user with temporary password.
+    Only accessible by Super Admins.
+    
+    Flow:
+    1. Checks if user exists
+    2. If not, creates user with temp password
+    3. Assigns admin role and establishment via RPC
+    4. Returns temp credentials
+    """
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Admin client not configured")
+    
+    email = request.email.strip().lower()
+    establishment_id = request.establishment_id
+    temp_password = "Manda2024!"
+    
+    try:
+        # 1. Check if user already exists
+        existing_users = supabase_admin.auth.admin.list_users()
+        user_exists = any(u.email == email for u in existing_users)
+        
+        user_id = None
+        
+        if not user_exists:
+            # 2. Create new user with temporary password
+            print(f"Creating new admin user: {email}")
+            create_response = supabase_admin.auth.admin.create_user({
+                "email": email,
+                "password": temp_password,
+                "email_confirm": True  # Skip email verification
+            })
+            
+            user_id = create_response.user.id
+            print(f"User created with ID: {user_id}")
+        else:
+            # Get existing user ID
+            for u in existing_users:
+                if u.email == email:
+                    user_id = u.id
+                    print(f"User already exists with ID: {user_id}")
+                    break
+        
+        # 3. Assign admin role and establishment via RPC
+        print(f"Assigning admin via RPC for {email} to {establishment_id}")
+        
+        data = None
+        try:
+            assign_response = supabase_admin.rpc('assign_establishment_admin', {
+                'p_email': email,
+                'p_establishment_id': establishment_id
+            }).execute()
+            
+            print(f"RPC Response Object: {assign_response}")
+            
+            if hasattr(assign_response, 'data'):
+                data = assign_response.data
+            elif hasattr(assign_response, 'json'):
+                 data = assign_response.json()
+                 
+        except Exception as rpc_error:
+            # WORKAROUND: Extract data from "JSON could not be generated" error
+            error_str = str(rpc_error)
+            print(f"Caught RPC Error: {error_str}")
+            
+            recovered_data = None
+            
+            # Check for generic "JSON could not be generated" error pattern
+            if "JSON could not be generated" in error_str:
+                try:
+                    # Strategy: Find "Innermost" JSON candidates { ... "status" ... }
+                    # We want a block starting with { and ending with } that does NOT contain other { or }.
+                    # Pattern: { [no braces] status [no braces] }
+                    pattern = r'(\{[^{}]*?status[^{}]*?\})'
+                    candidates = re.findall(pattern, error_str, re.DOTALL | re.IGNORECASE)
+                    
+                    for candidate in candidates:
+                        # Cleaning possibilities
+                        attempts = [
+                            candidate,
+                            candidate.replace('\\"', '"'),
+                            candidate.replace('\\"', '"').replace("\\'", "'"),
+                            candidate.replace('\"', '"'),
+                            candidate.replace('\\\\"', '\\"').replace('\\"', '"'),
+                        ]
+                        
+                        for attempt in attempts:
+                            try:
+                                parsed = json.loads(attempt)
+                                if isinstance(parsed, dict) and "status" in parsed:
+                                    recovered_data = parsed
+                                    print(f"Recovered data from error: {recovered_data}")
+                                    break
+                            except:
+                                continue
+                        if recovered_data:
+                            break
+                except Exception as e:
+                    print(f"Error during recovery attempt: {e}")
+
+            if recovered_data:
+                data = recovered_data
+            else:
+                # If we couldn't recover, re-raise the original error
+                raise rpc_error
+             
+        if isinstance(data, list) and len(data) > 0:
+            data = data[0]
+            
+        # The RPC returns JSONB which is already a dict in Python
+        if data and (data.get('status') == 'success' or data.get('status') == 'create_required'):
+            
+            # UPDATE PROFILE if name/phone provided
+            if user_id and (request.full_name or request.phone_number):
+                try:
+                    profile_update = {}
+                    if request.full_name:
+                        profile_update['full_name'] = request.full_name
+                    if request.phone_number:
+                        profile_update['phone_number'] = request.phone_number
+                    
+                    print(f"Updating admin profile for {user_id}: {profile_update}")
+                    # Use supabase_admin to bypass RLS if needed, though profiles should be equitable by owner.
+                    # As this is a super admin operation, supabase_admin is improved.
+                    supabase_admin.from_('profiles').update(profile_update).eq('id', user_id).execute()
+                except Exception as pe:
+                    print(f"WARNING: Failed to update admin profile: {pe}")
+
+            return {
+                "status": "success",
+                "message": f"Admin {'created' if not user_exists else 'updated'} successfully",
+                "email": email,
+                "temp_password": temp_password if not user_exists else None,
+                "user_id": user_id,
+                "user_existed": user_exists,
+                "rpc_response": data
+            }
+        else:
+            error_msg = data.get('message') if data else 'Unknown RPC handling error'
+            print(f"RPC Error Data: {data}")
+            raise HTTPException(status_code=500, detail=f"Failed to assign admin: {error_msg}")
+            
+    except Exception as e:
+        print(f"Error creating admin: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/establishment-admin/{establishment_id}")
+async def get_establishment_admin(
+    establishment_id: str,
+    user = Depends(get_current_super_admin)
+):
+    """
+    Fetches the admin user info (email) for a specific establishment.
+    """
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Admin client not configured")
+        
+    try:
+        # 1. Find the profile with role 'admin' for this establishment
+        # Note: We assume only one admin per establishment for now, or take the first one
+        response = supabase_admin.from_('profiles')\
+            .select('id, full_name, phone_number')\
+            .eq('establishment_id', establishment_id)\
+            .eq('role', 'admin')\
+            .execute()
+            
+        profiles = response.data
+        if not profiles:
+             return {"email": None, "full_name": None, "phone_number": None}
+             
+        # 2. Get the user email from auth admin
+        admin_profile = profiles[0]
+        user_id = admin_profile['id']
+        
+        user_info = supabase_admin.auth.admin.get_user_by_id(user_id)
+        
+        return {
+            "email": user_info.user.email,
+            "full_name": admin_profile.get('full_name'),
+            "phone_number": admin_profile.get('phone_number')
+        }
+        
+    except Exception as e:
+        print(f"Error fetching establishment admin: {e}")
+        # Don't fail the UI if we can't find the admin, just return empty
+        return {"email": None, "error": str(e)}
+
+# Add Logging Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {request.method} {request.url.path}")
+    response = await call_next(request)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Completed {response.status_code}")
+    return response
+
+@app.delete("/admin/establishments/{establishment_id}")
+async def delete_establishment(
+    establishment_id: str,
+    user = Depends(get_current_super_admin)
+):
+    """
+    Deletes an establishment and unlinks all associated users.
+    Checks for pending orders first.
+    Only accessible by Super Admins.
+    """
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Admin client not configured")
+        
+    try:
+        print(f"Super Admin {user.user.email} requesting deletion of establishment {establishment_id}")
+        
+        # 0. Check for PENDING orders
+        # We consider pending if status is NOT 'completed' or 'cancelled' or 'rejected'
+        pending_orders = supabase_admin.from_('orders')\
+            .select('id', count='exact')\
+            .eq('establishment_id', establishment_id)\
+            .not_.in_('status', ['completed', 'cancelled', 'rejected'])\
+            .execute()
+            
+        if pending_orders.count and pending_orders.count > 0:
+            return JSONResponse(
+                status_code=409, 
+                content={
+                    "status": "error", 
+                    "code": "PENDING_ORDERS", 
+                    "message": f"There are {pending_orders.count} active orders.",
+                    "count": pending_orders.count
+                }
+            )
+
+        # 1. CLEANUP DATA (Manual Cascade)
+        # We need to delete data in order to avoid FK violations (deliveries -> orders -> establishment)
+        
+        # Get all order IDs for this establishment
+        orders_res = supabase_admin.from_('orders').select('id').eq('establishment_id', establishment_id).execute()
+        order_ids = [o['id'] for o in orders_res.data]
+        
+        if order_ids:
+            # Delete Deliveries linked to these orders
+            supabase_admin.from_('deliveries').delete().in_('order_id', order_ids).execute()
+            # Delete Order Items linked to these orders
+            supabase_admin.from_('order_items').delete().in_('order_id', order_ids).execute()
+            # Delete Orders
+            supabase_admin.from_('orders').delete().in_('id', order_ids).execute()
+            
+        # Delete Products, Categories, Tables (usually have FK cascade to establishment, but let's be safe)
+        supabase_admin.from_('products').delete().eq('establishment_id', establishment_id).execute()
+        supabase_admin.from_('categories').delete().eq('establishment_id', establishment_id).execute()
+        supabase_admin.from_('tables').delete().eq('establishment_id', establishment_id).execute()
+
+        # 2. Unlink all profiles associated with this establishment
+        supabase_admin.from_('profiles')\
+            .update({'establishment_id': None})\
+            .eq('establishment_id', establishment_id)\
+            .execute()
+            
+        # 3. Delete the establishment
+        delete_response = supabase_admin.from_('establishments')\
+            .delete()\
+            .eq('id', establishment_id)\
+            .execute()
+            
+        print(f"Deleted establishment response: {delete_response}")
+        
+        return {"status": "success", "message": "Establishment deleted successfully"}
+        
+    except Exception as e:
+        print(f"Error deleting establishment: {e}")
+        # If we caught the 409 above, it's already returned. This catches unexpected errors.
         raise HTTPException(status_code=500, detail=str(e))

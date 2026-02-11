@@ -47,16 +47,17 @@ class _ScanScreenState extends State<ScanScreen> {
       if (response == null) {
         response = await _supabase
             .from('tables')
-            .select('table_number, id')
+            .select(
+                'table_number, id, establishment_id') // [NEW] Fetch establishment_id
             .eq('table_number', code.padLeft(2, '0')) // Try "05"
             .maybeSingle();
 
         // Try exact match "5"
         response ??= await _supabase
-              .from('tables')
-              .select('table_number, id')
-              .eq('table_number', code)
-              .maybeSingle();
+            .from('tables')
+            .select('table_number, id, establishment_id')
+            .eq('table_number', code)
+            .maybeSingle();
       }
 
       if (response == null) {
@@ -67,16 +68,18 @@ class _ScanScreenState extends State<ScanScreen> {
                     Text('${AppTranslations.of(context, 'invalidQR')}: $code'),
                 backgroundColor: Colors.red),
           );
-          _isScanned = false; // Allow retry
-          return;
         }
+        _isScanned = false; // Allow retry
+        return;
       }
 
-      final tableNumber = response!['table_number'];
+      final tableNumber = response['table_number'];
+      final establishmentId = response['establishment_id'] as String?; // [NEW]
 
       // Update global CartService so Checkout knows the table!
       CartService().setTableId(tableNumber.toString(),
-          explicit: true); // QR scan = explicit
+          explicit: true,
+          establishmentId: establishmentId); // [NEW] Pass context
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

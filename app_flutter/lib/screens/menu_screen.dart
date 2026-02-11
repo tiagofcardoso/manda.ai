@@ -19,6 +19,7 @@ import 'driver/driver_home_screen.dart';
 import 'client_orders_screen.dart'; // Import Client Orders
 import 'scan_screen.dart';
 import '../constants/categories.dart';
+import '../services/settings_service.dart';
 import 'package:animate_do/animate_do.dart';
 // For barcode scanner usually, but using mock for now or simple dialog logic
 
@@ -75,11 +76,32 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<List<Product>> _fetchProducts() async {
-    final response = await _supabase
-        .from('products')
-        .select()
-        .eq('is_available', true)
-        .order('name', ascending: true);
+    final estId = _cartService.establishmentId;
+
+    // If no establishment selected (e.g. fresh install, no scan), what to do?
+    // For now, if no ID, return empty or default?
+    // Let's assume user MUST scan or select store.
+    if (estId == null) {
+      print('DEBUG: No Establishment ID set. Returning empty menu.');
+      // return []; // Strict Mode
+      // FALLBACK for demo: Fetch all (Legacy) - remove this for production
+      // return [];
+    }
+
+    // Start building query
+    // Cast to PostgrestFilterBuilder to allow filtering
+    var query = _supabase.from('products').select();
+
+    // Apply Filters
+    if (estId != null) {
+      query = query.eq('establishment_id', estId);
+    }
+
+    // Always apply available filter
+    query = query.eq('is_available', true);
+
+    // Apply Order & Execute
+    final response = await query.order('name', ascending: true);
 
     final data = response as List<dynamic>;
     return data.map((json) => Product.fromJson(json)).toList();
@@ -192,6 +214,18 @@ class _MenuScreenState extends State<MenuScreen> {
               ),
             ),
             // Common Menu (Always Visible)
+            if (!isTableMode)
+              ListTile(
+                leading: Icon(LucideIcons.store,
+                    color: isDark ? Colors.white : Colors.black),
+                title: Text("Change Store", // TODO: Translate
+                    style:
+                        TextStyle(color: isDark ? Colors.white : Colors.black)),
+                onTap: () {
+                  // Go back to landing or marketplace
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+              ),
             ListTile(
               leading: Icon(LucideIcons.utensils,
                   color: isDark ? Colors.white : Colors.black),
@@ -708,14 +742,21 @@ class _MenuScreenState extends State<MenuScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        NumberFormat.currency(symbol: product.currency)
-                            .format(product.price),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFE63946),
-                        ),
+                      ValueListenableBuilder<String>(
+                        valueListenable: SettingsService().currencyNotifier,
+                        builder: (context, currency, _) {
+                          final symbol =
+                              SettingsService().getCurrencySymbol(currency);
+                          return Text(
+                            NumberFormat.currency(symbol: symbol)
+                                .format(product.price),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFE63946),
+                            ),
+                          );
+                        },
                       ),
                       // Add Button
                       GestureDetector(

@@ -10,19 +10,27 @@ class CartService {
   CartService._internal();
 
   String? _tableId;
+  String? _establishmentId; // [NEW] Track active store
   String? _deliveryAddress;
   bool _isExplicitTableMode = false; // Tracks if table was set by QR scan
 
   final ValueNotifier<List<CartItem>> itemsNotifier = ValueNotifier([]);
 
   String? get tableId => _tableId;
+  String? get establishmentId => _establishmentId;
   bool get isExplicitTableMode => _isExplicitTableMode;
 
   // Load table session on app start
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final savedTableId = prefs.getString('table_id');
+    final savedEstId = prefs.getString('establishment_id');
     final savedExplicitFlag = prefs.getBool('is_explicit_table_mode') ?? false;
+
+    // Restore establishment if available
+    if (savedEstId != null) {
+      _establishmentId = savedEstId;
+    }
 
     // Only restore if it was an explicit QR scan session
     if (savedTableId != null && savedExplicitFlag) {
@@ -31,10 +39,16 @@ class CartService {
     }
   }
 
-  Future<void> setTableId(String id, {bool explicit = false}) async {
+  Future<void> setTableId(String id,
+      {bool explicit = false, String? establishmentId}) async {
     _tableId = id;
     _isExplicitTableMode = explicit; // Mark if this was a QR scan
     _deliveryAddress = null; // Reset delivery address if table is set
+
+    // Update establishment if provided
+    if (establishmentId != null) {
+      await setEstablishmentId(establishmentId);
+    }
 
     // Persist if explicit (QR scan)
     if (explicit) {
@@ -42,6 +56,16 @@ class CartService {
       await prefs.setString('table_id', id);
       await prefs.setBool('is_explicit_table_mode', true);
     }
+  }
+
+  Future<void> setEstablishmentId(String id) async {
+    if (_establishmentId != id) {
+      _establishmentId = id;
+      // Optionally clear cart if switching stores? For now, keep it simple.
+      // itemsNotifier.value = [];
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('establishment_id', id);
   }
 
   Future<void> setDeliveryAddress(String address) async {
@@ -53,6 +77,8 @@ class CartService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('table_id');
     await prefs.remove('is_explicit_table_mode');
+
+    // NOTE: We do NOT clear establishment_id here, as delivery still happens within a store context.
   }
 
   List<CartItem> get items => itemsNotifier.value;

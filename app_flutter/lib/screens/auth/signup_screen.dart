@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/app_translations.dart';
 import '../../services/auth_service.dart';
@@ -11,8 +12,7 @@ class SignUpScreen extends StatefulWidget {
   State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen>
-    with SingleTickerProviderStateMixin {
+class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Basic Info
@@ -31,26 +31,13 @@ class _SignUpScreenState extends State<SignUpScreen>
   bool _isDriver = false;
   bool _isLoading = false;
 
-  late AnimationController _animController;
-  late Animation<double> _fadeAnimation;
-
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeInOut,
-    );
-    _animController.forward();
   }
 
   @override
   void dispose() {
-    _animController.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -127,356 +114,250 @@ class _SignUpScreenState extends State<SignUpScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black, // Fallback
-      body: Stack(
-        children: [
-          // Background Gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF0F2027),
-                  Color(0xFF203A43),
-                  Color(0xFF2C5364),
-                ],
-              ),
-            ),
-          ),
+    final theme = Theme.of(context);
 
-          // Content
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: const EdgeInsets.all(32),
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: BackButton(color: theme.colorScheme.onSurface),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: theme.dividerColor),
+              ),
+              color: theme.cardTheme.color,
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Icon(
+                        _isDriver ? LucideIcons.truck : LucideIcons.user,
+                        size: 48,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        AppTranslations.of(context, 'signUp'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _isDriver
+                            ? AppTranslations.of(context, 'joinFleetMessage')
+                            : AppTranslations.of(
+                                context, 'createAccountMessage'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Basic Info Fields
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: AppTranslations.of(context, 'fullName'),
+                          prefixIcon: const Icon(LucideIcons.user),
+                        ),
+                        validator: (v) =>
+                            v?.isEmpty == true ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: InputDecoration(
+                          labelText: AppTranslations.of(context, 'email'),
+                          prefixIcon: const Icon(LucideIcons.mail),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) =>
+                            v?.contains('@') == true ? null : 'Invalid email',
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        decoration: InputDecoration(
+                          labelText: AppTranslations.of(context, 'password'),
+                          prefixIcon: const Icon(LucideIcons.lock),
+                        ),
+                        obscureText: true,
+                        validator: (v) =>
+                            (v?.length ?? 0) < 6 ? 'Min 6 chars' : null,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Role Switch
+                      Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border:
-                              Border.all(color: Colors.white.withOpacity(0.1)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: theme.dividerColor),
+                        ),
+                        child: SwitchListTile(
+                          title: Text(
+                            AppTranslations.of(context, 'iWantToDeliver'),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            AppTranslations.of(
+                                context, 'registerDeliveryPartner'),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          secondary: Icon(
+                            LucideIcons.bike,
+                            color: _isDriver
+                                ? theme.colorScheme.primary
+                                : theme.disabledColor,
+                          ),
+                          value: _isDriver,
+                          activeColor: theme.colorScheme.primary,
+                          onChanged: (val) => setState(() => _isDriver = val),
+                        ),
+                      ),
+
+                      // Delivery Details
+                      if (_isDriver) ...[
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        Text(
+                          AppTranslations.of(context, 'deliveryDetails'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _phoneController,
+                          decoration: InputDecoration(
+                            labelText:
+                                AppTranslations.of(context, 'phoneNumber'),
+                            prefixIcon: const Icon(LucideIcons.phone),
+                          ),
+                          keyboardType: TextInputType.phone,
+                          validator: (v) =>
+                              v?.isEmpty == true ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                controller: _streetController,
+                                decoration: InputDecoration(
+                                  labelText: AppTranslations.of(
+                                      context, 'streetAddress'),
+                                  prefixIcon: const Icon(LucideIcons.home),
+                                ),
+                                validator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _zipController,
+                                decoration: InputDecoration(
+                                  labelText:
+                                      AppTranslations.of(context, 'zipCode'),
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
+                              ),
                             ),
                           ],
                         ),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Header
-                              Icon(
-                                  _isDriver
-                                      ? Icons.local_shipping_outlined
-                                      : Icons.person_outline,
-                                  size: 60,
-                                  color: Colors.white),
-                              const SizedBox(height: 16),
-                              Text(
-                                AppTranslations.of(context, 'signUp'),
-                                style: const TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 1.2,
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _cityController,
+                                decoration: InputDecoration(
+                                  labelText:
+                                      AppTranslations.of(context, 'city'),
                                 ),
+                                validator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _isDriver
-                                    ? AppTranslations.of(
-                                        context, 'joinFleetMessage')
-                                    : AppTranslations.of(
-                                        context, 'createAccountMessage'),
-                                style: const TextStyle(color: Colors.white60),
-                              ),
-                              const SizedBox(height: 32),
-
-                              // Basic Info Fields
-                              _buildGlassTextField(
-                                controller: _nameController,
-                                label: AppTranslations.of(context, 'fullName'),
-                                icon: Icons.person_rounded,
-                              ),
-                              const SizedBox(height: 16),
-                              _buildGlassTextField(
-                                controller: _emailController,
-                                label: AppTranslations.of(context, 'email'),
-                                icon: Icons.email_rounded,
-                                keyboardType: TextInputType.emailAddress,
-                              ),
-                              const SizedBox(height: 16),
-                              _buildGlassTextField(
-                                controller: _passwordController,
-                                label: AppTranslations.of(context, 'password'),
-                                icon: Icons.lock_rounded,
-                                isPassword: true,
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Role Switch (Driver vs Client)
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(15),
-                                  border: Border.all(color: Colors.white10),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _stateController,
+                                decoration: InputDecoration(
+                                  labelText:
+                                      AppTranslations.of(context, 'state'),
                                 ),
-                                child: SwitchListTile(
-                                  title: Text(
-                                    AppTranslations.of(
-                                        context, 'iWantToDeliver'),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    AppTranslations.of(
-                                        context, 'registerDeliveryPartner'),
-                                    style: const TextStyle(
-                                        color: Colors.white54, fontSize: 12),
-                                  ),
-                                  secondary: Icon(
-                                      Icons.sports_motorsports_rounded,
-                                      color: _isDriver
-                                          ? Colors.amber
-                                          : Colors.white54),
-                                  value: _isDriver,
-                                  activeThumbColor: Colors.amber,
-                                  activeTrackColor:
-                                      Colors.amber.withOpacity(0.3),
-                                  onChanged: (val) {
-                                    setState(() => _isDriver = val);
-                                  },
-                                ),
+                                validator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
                               ),
-
-                              // Delivery Details (Always Visible)
-                              Column(
-                                children: [
-                                  const SizedBox(height: 24),
-                                  const Divider(color: Colors.white24),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    AppTranslations.of(
-                                        context, 'deliveryDetails'),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildGlassTextField(
-                                    controller: _phoneController,
-                                    label: AppTranslations.of(
-                                        context, 'phoneNumber'),
-                                    icon: Icons.phone_rounded,
-                                    keyboardType: TextInputType.phone,
-                                    required: true,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 2,
-                                        child: _buildGlassTextField(
-                                          controller: _streetController,
-                                          label: AppTranslations.of(
-                                              context, 'streetAddress'),
-                                          icon: Icons.home_rounded,
-                                          required: true,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _buildGlassTextField(
-                                          controller: _zipController,
-                                          label: AppTranslations.of(
-                                              context, 'zipCode'),
-                                          icon: Icons.map_rounded,
-                                          keyboardType: TextInputType.number,
-                                          required: true,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _buildGlassTextField(
-                                          controller: _cityController,
-                                          label: AppTranslations.of(
-                                              context, 'city'),
-                                          icon: Icons.location_city_rounded,
-                                          required: true,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _buildGlassTextField(
-                                          controller: _stateController,
-                                          label: AppTranslations.of(
-                                              context, 'state'),
-                                          icon: Icons.map,
-                                          required: true,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildGlassTextField(
-                                    controller: _countryController,
-                                    label:
-                                        AppTranslations.of(context, 'country'),
-                                    icon: Icons.flag_rounded,
-                                    required: true,
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 40),
-
-                              // Sign Up Button
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        _isDriver ? Colors.amber : Colors.blue,
-                                    foregroundColor: Colors.black,
-                                    elevation: 5,
-                                    shadowColor:
-                                        (_isDriver ? Colors.amber : Colors.blue)
-                                            .withOpacity(0.4),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(16)),
-                                  ),
-                                  onPressed: _isLoading ? null : _signUp,
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 24,
-                                          width: 24,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.black),
-                                        )
-                                      : Text(
-                                          AppTranslations.of(context, 'signUp')
-                                              .toUpperCase(),
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              // Back to Login
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white70),
-                                child: RichText(
-                                  text: TextSpan(
-                                    text: '${AppTranslations.of(
-                                            context, 'alreadyHaveAccount')} ',
-                                    style:
-                                        const TextStyle(color: Colors.white60),
-                                    children: [
-                                      TextSpan(
-                                        text: AppTranslations.of(
-                                            context, 'signInAction'),
-                                        style: TextStyle(
-                                          color: _isDriver
-                                              ? Colors.amber
-                                              : Colors.blue,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _countryController,
+                          decoration: InputDecoration(
+                            labelText: AppTranslations.of(context, 'country'),
+                            prefixIcon: const Icon(LucideIcons.flag),
                           ),
+                          validator: (v) =>
+                              v?.isEmpty == true ? 'Required' : null,
+                        ),
+                      ],
+
+                      const SizedBox(height: 40),
+
+                      // Sign Up Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _signUp,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                              : Text(AppTranslations.of(context, 'signUp')
+                                  .toUpperCase()),
                         ),
                       ),
-                    ),
+
+                      const SizedBox(height: 20),
+
+                      // Back to Login
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(AppTranslations.of(context, 'haveAccount')),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGlassTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool isPassword = false,
-    TextInputType? keyboardType,
-    bool required = true,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: TextFormField(
-        controller: controller,
-        obscureText: isPassword,
-        keyboardType: keyboardType,
-        style:
-            const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-        cursorColor: _isDriver ? Colors.amber : Colors.blue,
-        validator: required
-            ? (value) {
-                if (value == null || value.isEmpty) {
-                  return AppTranslations.of(context, 'requiredField');
-                }
-                return null;
-              }
-            : null,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(color: Colors.white54),
-          prefixIcon: Icon(icon, color: Colors.white54, size: 20),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide(
-              color: _isDriver ? Colors.amber : Colors.blue,
-              width: 1.5,
-            ),
-          ),
-          errorStyle: const TextStyle(color: Colors.redAccent, height: 0.8),
         ),
       ),
     );
