@@ -29,6 +29,7 @@ class _EstablishmentEditorScreenModernState
   final _contactNameController = TextEditingController();
   final _contactPhoneController = TextEditingController();
   final _adminEmailController = TextEditingController();
+  final _passwordController = TextEditingController(); // NEW
 
   final _zipCodeController = TextEditingController();
   final _streetController = TextEditingController();
@@ -147,6 +148,7 @@ class _EstablishmentEditorScreenModernState
     _contactNameController.dispose();
     _contactPhoneController.dispose();
     _adminEmailController.dispose();
+    _passwordController.dispose(); // NEW
     _zipCodeController.dispose();
     _streetController.dispose();
     _numberController.dispose();
@@ -266,6 +268,10 @@ class _EstablishmentEditorScreenModernState
           'establishment_id': establishmentId,
           'full_name': _contactNameController.text.trim(),
           'phone_number': _contactPhoneController.text.trim(),
+          'password': _passwordController.text.trim().isNotEmpty
+              ? _passwordController.text.trim()
+              : null,
+          'establishment_name': _nameController.text.trim(),
         }),
       );
 
@@ -273,44 +279,7 @@ class _EstablishmentEditorScreenModernState
         final data = jsonDecode(response.body);
         debugPrint('Admin Created/Assigned: ${data}');
 
-        // Show credentials if new user was created
-        if (data['temp_password'] != null && mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(_t('adminCreated')),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_t('adminCredentials')),
-                  const SizedBox(height: 16),
-                  SelectableText(
-                    'Email: ${data['email']}\nSenha: ${data['temp_password']}',
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _t('adminPasswordChangeNote'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.orange[700],
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(_t('ok')),
-                ),
-              ],
-            ),
-          );
-        } else if (mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(_t('adminAssignedSuccess')),
@@ -521,6 +490,15 @@ class _EstablishmentEditorScreenModernState
                             icon: LucideIcons.mail,
                             placeholder: _t('adminEmail'),
                           ),
+                          const SizedBox(height: 16),
+                          // Password Field (Only for new establishments/admins)
+                          if (widget.establishment == null)
+                            AdminBottomLineTextField(
+                              controller: _passwordController,
+                              icon: LucideIcons.lock,
+                              placeholder: 'Senha Inicial (Opcional)',
+                              obscureText: true,
+                            ),
                           Padding(
                             padding: const EdgeInsets.only(left: 36, top: 4),
                             child: Text(

@@ -14,6 +14,7 @@ import '../screens/client_orders_screen.dart';
 import '../screens/guest_table_order_screen.dart';
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
+import '../screens/profile_screen.dart'; // NEW
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -161,6 +162,14 @@ class _AppDrawerState extends State<AppDrawer> {
                           leading: const Icon(LucideIcons.shoppingBag),
                           title: Text(AppTranslations.of(context, 'myOrders')),
                           onTap: () => _navigateTo(const ClientOrdersScreen()),
+                        ),
+
+                      // Profile (All Authenticated Users)
+                      if (_role != null)
+                        ListTile(
+                          leading: const Icon(LucideIcons.user),
+                          title: Text(AppTranslations.of(context, 'myProfile')),
+                          onTap: () => _navigateTo(const ProfileScreen()),
                         ),
 
                       // Scan QR (Clients Only) - Mobile Only

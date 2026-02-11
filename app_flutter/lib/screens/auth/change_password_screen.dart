@@ -130,7 +130,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   // Confirm Password
                   AdminBottomLineTextField(
                     controller: _confirmController,
-                    icon: LucideIcons.checkSame,
+                    icon: LucideIcons.check,
                     placeholder: _t('confirmPassword'),
                     obscureText: true,
                     validator: (v) {

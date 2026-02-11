@@ -29,6 +29,7 @@ class AdminBottomLineTextField extends StatelessWidget {
   final int maxLines;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
+  final bool obscureText;
 
   const AdminBottomLineTextField({
     super.key,
@@ -38,6 +39,7 @@ class AdminBottomLineTextField extends StatelessWidget {
     this.maxLines = 1,
     this.validator,
     this.onChanged,
+    this.obscureText = false,
   });
 
   @override
@@ -57,6 +59,7 @@ class AdminBottomLineTextField extends StatelessWidget {
                 maxLines: maxLines,
                 validator: validator,
                 onChanged: onChanged,
+                obscureText: obscureText,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,

@@ -277,7 +277,7 @@ class AppTranslations {
       'firstLoginSubtitle':
           'For your security, please change your temporary password.',
       'welcomeTitle': 'Congratulations!',
-      'welcomeMessage': 'Let\'s grow your business together! \ud83d\ude80',
+      'welcomeMessageBiz': 'Let\'s grow your business together! \ud83d\ude80',
       'adminCreated': 'Admin Created',
       'adminCredentials': 'Send these credentials to the new admin:',
       'adminPasswordChangeNote':
@@ -573,7 +573,8 @@ class AppTranslations {
       'firstLoginSubtitle':
           'Para sua seguran\u00e7a, por favor altere sua senha tempor\u00e1ria.',
       'welcomeTitle': 'Parab\u00e9ns!',
-      'welcomeMessage': 'Vamos crescer seu neg\u00f3cio juntos! \ud83d\ude80',
+      'welcomeMessageBiz':
+          'Vamos crescer seu neg\u00f3cio juntos! \ud83d\ude80',
       'adminCreated': 'Admin Criado',
       'adminCredentials': 'Envie estas credenciais para o novo admin:',
       'adminPasswordChangeNote':
@@ -594,6 +595,16 @@ class AppTranslations {
       'resolvePendingOrders':
           'Por favor, finalize ou cancele todos os pedidos ativos antes de apagar.',
       'storeDeleted': 'Estabelecimento apagado com sucesso!',
+      // Profile
+      'myProfile': 'Meu Perfil',
+      'personalInfo': 'Informações Pessoais',
+      'billingAddress': 'Dados de Faturação',
+      'vatNumber': 'NIF / CPF',
+      'vatName': 'Nome na Fatura',
+      'vatAddress': 'Endereço Fiscal',
+      'sameAsDelivery': 'Mesmo endereço de entrega',
+      'profileSaved': 'Perfil salvo com sucesso!',
+      'saveProfile': 'SALVAR PERFIL',
     },
   };
 

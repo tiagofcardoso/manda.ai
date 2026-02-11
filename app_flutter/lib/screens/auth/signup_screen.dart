@@ -19,6 +19,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController(); // NEW
 
   // Driver Info
   final _phoneController = TextEditingController();
@@ -41,6 +42,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose(); // NEW
     _phoneController.dispose();
     _streetController.dispose();
     _zipController.dispose();
@@ -199,6 +201,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         obscureText: true,
                         validator: (v) =>
                             (v?.length ?? 0) < 6 ? 'Min 6 chars' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        decoration: InputDecoration(
+                          labelText:
+                              AppTranslations.of(context, 'confirmPassword'),
+                          prefixIcon: const Icon(LucideIcons.checkCircle),
+                        ),
+                        obscureText: true,
+                        validator: (v) {
+                          if (v != _passwordController.text) {
+                            return AppTranslations.of(
+                                context, 'passwordsDoNotMatch');
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 24),
 

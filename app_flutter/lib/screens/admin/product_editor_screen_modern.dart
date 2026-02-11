@@ -10,6 +10,7 @@ import '../../constants/api.dart';
 import '../../services/app_translations.dart';
 import '../../widgets/admin/admin_centered_layout.dart';
 import '../../widgets/admin/admin_form_fields.dart';
+import '../../services/locale_service.dart'; // NEW import
 
 class ProductEditorScreenModern extends StatefulWidget {
   final Product? product;
@@ -27,8 +28,10 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
   final _imageController = TextEditingController();
+  final _customCategoryController = TextEditingController(); // NEW
   String? _selectedCategory;
   final _settingsService = SettingsService();
+  String? _establishmentType; // NEW: to filter categories
 
   bool _isLoading = false;
   bool _isUploading = false;
@@ -45,7 +48,14 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
       _priceController.text = widget.product!.price.toString();
       _imageController.text = widget.product!.imageUrl ?? '';
       _selectedCategory = widget.product!.categoryId;
+      // Also check for custom category if id is null or not in predefined list
+      if (widget.product!.categoryId == null &&
+          widget.product!.customCategory != null) {
+        _selectedCategory = 'custom_other';
+        _customCategoryController.text = widget.product!.customCategory!;
+      }
     }
+    _fetchEstablishmentType(); // NEW
   }
 
   @override
@@ -53,8 +63,42 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
     _nameController.dispose();
     _descController.dispose();
     _priceController.dispose();
+    _priceController.dispose();
     _imageController.dispose();
+    _customCategoryController.dispose(); // NEW
     super.dispose();
+  }
+
+  // NEW: Fetch establishment type to filter categories
+  Future<void> _fetchEstablishmentType() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final profile = await supabase
+          .from('profiles')
+          .select('establishment_id')
+          .eq('id', userId)
+          .single();
+
+      final establishmentId = profile['establishment_id'] as String?;
+      if (establishmentId != null) {
+        final est = await supabase
+            .from('establishments')
+            .select('type')
+            .eq('id', establishmentId)
+            .single();
+
+        if (mounted) {
+          setState(() {
+            _establishmentType = est['type'] as String?;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching establishment type: $e');
+    }
   }
 
   // Translation helper method
@@ -140,6 +184,17 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
       return;
     }
 
+    if (_selectedCategory == 'custom_other' &&
+        _customCategoryController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, informe a categoria personalizada'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -151,8 +206,16 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
         'description': _descController.text.trim(),
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
         'image_url': _imageController.text.trim(),
-        'category_id': _selectedCategory,
         'is_available': true,
+        // IF selected category is 'custom_other' OR a string key (not UUID), send as custom_category
+        // For now, assuming all keys in APP_CATEGORIES are string keys, NOT UUIDs.
+        // So we should always send category_id as null and key as custom_category
+        // UNLESS the backend logic changes to support lookup by key.
+        // But to be safe and fix the error:
+        'category_id': null,
+        'custom_category': _selectedCategory == 'custom_other'
+            ? _customCategoryController.text.trim()
+            : _selectedCategory,
       });
 
       final url = widget.product != null
@@ -201,7 +264,9 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
     _nameController.clear();
     _descController.clear();
     _priceController.clear();
+    _priceController.clear();
     _imageController.clear();
+    _customCategoryController.clear(); // NEW
     setState(() {
       _selectedCategory = null;
       _stockControl = false;
@@ -471,6 +536,72 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
   }
 
   Widget _buildCategorySection(Color primaryColor) {
+    // If a category is selected, show a specialized view
+    if (_selectedCategory != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              AdminSectionLabel(_t('productCategory')),
+              TextButton(
+                onPressed: () => setState(() => _selectedCategory = null),
+                child: Text(
+                  'Alterar',
+                  style: TextStyle(color: primaryColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_selectedCategory == 'custom_other') ...[
+            AdminBottomLineTextField(
+              controller: _customCategoryController,
+              icon: Icons.edit_note_rounded,
+              placeholder: 'Nome da Categoria (Ex: Churrasco Premium)',
+              validator: (v) => v?.isEmpty ?? true ? 'Obrigatório' : null,
+            ),
+          ] else ...[
+            // Show selected category chip
+            Builder(builder: (context) {
+              final selectedCat = APP_CATEGORIES.values.firstWhere(
+                (c) => c['id'] == _selectedCategory,
+                orElse: () => {},
+              );
+
+              if (selectedCat.isEmpty) return const SizedBox.shrink();
+
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(selectedCat['icon'] as IconData,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      LocaleService().localeNotifier.value.languageCode == 'pt'
+                          ? selectedCat['label']
+                          : selectedCat['en_label'],
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      );
+    }
+
+    // Default View: List of Categories
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -500,10 +631,45 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              APP_CATEGORIES.entries.where((e) => e.key != 'all').map((entry) {
+          children: APP_CATEGORIES.entries.where((e) {
+            if (e.key == 'all') return false;
+
+            // Filter Logic based on establishment type
+            if (_establishmentType != null) {
+              final types = List<String>.from(e.value['types'] ?? []);
+
+              // Always show categories marked for 'all' (like Custom)
+              if (types.contains('all')) return true;
+
+              // Strict filtering for Pharmacy
+              if (_establishmentType == 'pharmacy') {
+                return types.contains('pharmacy');
+              }
+
+              // Strict filtering for Beverages/Brewery
+              if (_establishmentType == 'beverages' ||
+                  _establishmentType == 'brewery') {
+                return types.contains('beverages');
+              }
+
+              // Restaurant logic: can show restaurant + beverages
+              if (_establishmentType == 'restaurant') {
+                return types.contains('restaurant') ||
+                    types.contains('beverages');
+              }
+
+              // Fallback: exact match
+              if (types.contains(_establishmentType)) return true;
+
+              return false;
+            }
+
+            return true; // If type not loaded yet, show all
+          }).map((entry) {
             final categoryData = entry.value;
             final isSelected = _selectedCategory == categoryData['id'];
+            final isPt =
+                LocaleService().localeNotifier.value.languageCode == 'pt';
 
             return GestureDetector(
               onTap: () => setState(
@@ -538,7 +704,9 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      categoryData['label'] as String,
+                      isPt
+                          ? categoryData['label'] as String
+                          : categoryData['en_label'] as String,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,

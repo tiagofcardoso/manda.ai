@@ -201,6 +201,7 @@ class ProductRequest(BaseModel):
     price: float
     image_url: str | None = None
     category_id: str | None = None
+    custom_category: str | None = None  # New field for user-defined categories
     is_available: bool = True
 
 @app.post("/admin/products")
@@ -691,10 +692,12 @@ class CreateAdminRequest(BaseModel):
     establishment_id: str
     full_name: str | None = None
     phone_number: str | None = None
+    password: str | None = None          # NEW
+    establishment_name: str | None = None # NEW
 
 @app.post("/admin/create-establishment-admin")
-def create_establishment_admin(
-    request: CreateAdminRequest,
+async def create_establishment_admin(
+    request: CreateAdminRequest, 
     user = Depends(get_current_super_admin)
 ):
     """
@@ -703,7 +706,7 @@ def create_establishment_admin(
     
     Flow:
     1. Checks if user exists
-    2. If not, creates user with temp password
+    2. If not, creates user with provided or temp password
     3. Assigns admin role and establishment via RPC
     4. Returns temp credentials
     """
@@ -712,101 +715,136 @@ def create_establishment_admin(
     
     email = request.email.strip().lower()
     establishment_id = request.establishment_id
-    temp_password = "Manda2024!"
+    temp_password = request.password if request.password else "Manda2024!"
     
     try:
         # 1. Check if user already exists
+        # NOTE: supabase_admin.auth.admin.list_users() can be slow if many users, 
+        # but for now it's okay. Better to use get_user_by_email if available but it's not exposed in python sdk easily
         existing_users = supabase_admin.auth.admin.list_users()
         user_exists = any(u.email == email for u in existing_users)
         
         user_id = None
         
         if not user_exists:
-            # 2. Create new user with temporary password
+            # 2. Create new user with password
             print(f"Creating new admin user: {email}")
             create_response = supabase_admin.auth.admin.create_user({
                 "email": email,
                 "password": temp_password,
-                "email_confirm": True  # Skip email verification
+                "email_confirm": True
             })
             
-            user_id = create_response.user.id
+            # The structure of create_response might differ based on SDK version
+            # Usually create_response.user.id
+            if hasattr(create_response, 'user') and create_response.user:
+                user_id = create_response.user.id
+            elif hasattr(create_response, 'id'):
+                user_id = create_response.id
+            else:
+                 # Fallback for some versions
+                 user_id = getattr(create_response, 'id', None)
+
             print(f"User created with ID: {user_id}")
         else:
             # Get existing user ID
             for u in existing_users:
                 if u.email == email:
                     user_id = u.id
-                    print(f"User already exists with ID: {user_id}")
                     break
         
-        # 3. Assign admin role and establishment via RPC
-        print(f"Assigning admin via RPC for {email} to {establishment_id}")
-        
-        data = None
+        if not user_id:
+            raise HTTPException(status_code=500, detail="Failed to retrieve User ID")
+            
+        # 3. Assign establishment and role via RPC
+        # RPC allows us to safely update the profile without RLS issues
         try:
-            assign_response = supabase_admin.rpc('assign_establishment_admin', {
-                'p_email': email,
-                'p_establishment_id': establishment_id
-            }).execute()
-            
-            print(f"RPC Response Object: {assign_response}")
-            
-            if hasattr(assign_response, 'data'):
-                data = assign_response.data
-            elif hasattr(assign_response, 'json'):
-                 data = assign_response.json()
-                 
+            rpc_response = supabase_admin.rpc(
+                'assign_establishment_admin', 
+                {
+                    'p_email': email, 
+                    'p_establishment_id': establishment_id,
+                    'p_custom_password': temp_password,
+                    'p_establishment_name': request.establishment_name
+                }
+            ).execute()
+            data = rpc_response.data
         except Exception as rpc_error:
-            # WORKAROUND: Extract data from "JSON could not be generated" error
-            error_str = str(rpc_error)
-            print(f"Caught RPC Error: {error_str}")
-            
+            print(f"RPC Error: {rpc_error}")
+            # Try to parse error if it's a JSON string in the exception message
+            # logic same as before...
+            # --------------------------------------------------------------------------------
+            # Handle APIError (e.g. from postgrest-py) on success (code 200)
+            # --------------------------------------------------------------------------------
             recovered_data = None
             
-            # Check for generic "JSON could not be generated" error pattern
-            if "JSON could not be generated" in error_str:
-                try:
-                    # Strategy: Find "Innermost" JSON candidates { ... "status" ... }
-                    # We want a block starting with { and ending with } that does NOT contain other { or }.
-                    # Pattern: { [no braces] status [no braces] }
-                    pattern = r'(\{[^{}]*?status[^{}]*?\})'
-                    candidates = re.findall(pattern, error_str, re.DOTALL | re.IGNORECASE)
-                    
-                    for candidate in candidates:
-                        # Cleaning possibilities
-                        attempts = [
-                            candidate,
-                            candidate.replace('\\"', '"'),
-                            candidate.replace('\\"', '"').replace("\\'", "'"),
-                            candidate.replace('\"', '"'),
-                            candidate.replace('\\\\"', '\\"').replace('\\"', '"'),
-                        ]
-                        
-                        for attempt in attempts:
-                            try:
-                                parsed = json.loads(attempt)
-                                if isinstance(parsed, dict) and "status" in parsed:
-                                    recovered_data = parsed
-                                    print(f"Recovered data from error: {recovered_data}")
-                                    break
-                            except:
-                                continue
-                        if recovered_data:
-                            break
-                except Exception as e:
-                    print(f"Error during recovery attempt: {e}")
+            # Check for APIError/code attribute
+            code = getattr(rpc_error, 'code', None)
+            details = getattr(rpc_error, 'details', None)
 
+            if str(code) == '200' and details:
+                # This happens when postgrest-py fails to interpret the response body (e.g. invalid content-type)
+                # but the request was actually successful.
+                # The 'details' is often the response body (bytes or string).
+                try:
+                     import json
+                     # If it's bytes or b'...' string representation, handle it?
+                     # Usually it is a string.
+                     if isinstance(details, bytes):
+                        details_str = details.decode('utf-8')
+                     else:
+                        details_str = str(details)
+                     
+                     # Simple heuristics to clean up b'...' representation if present in string
+                     if details_str.startswith("b'") and details_str.endswith("'"):
+                         details_str = details_str[2:-1]
+                         # Unescape escaped quotes if needed
+                         details_str = details_str.replace('\\"', '"').replace("\\'", "'")
+                     
+                     recovered_data = json.loads(details_str)
+                     print(f"Recovered success data from APIError: {recovered_data}")
+                except Exception as parse_err:
+                     print(f"Failed to parse APIError details: {parse_err}")
+            
             if recovered_data:
                 data = recovered_data
             else:
-                # If we couldn't recover, re-raise the original error
-                raise rpc_error
-             
+                # Fallback to old string parsing logic just in case
+                import json
+                error_str = str(rpc_error)
+                recovered_fallback = None
+                
+                if "{" in error_str:
+                    try:
+                        start = error_str.find("{")
+                        end = error_str.rfind("}") + 1
+                        json_str = error_str[start:end]
+                        # Attempt cleanup of escaped quotes
+                        candidates = [
+                             json_str,
+                             json_str.replace('\\"', '"'),
+                             json_str.replace('\\"', '"').replace("\\'", "'")
+                        ]
+                        for c in candidates:
+                             try:
+                                 parsed = json.loads(c)
+                                 if isinstance(parsed, dict) and "status" in parsed:
+                                     recovered_fallback = parsed
+                                     break
+                             except:
+                                 continue
+                    except:
+                        pass
+                
+                if recovered_fallback:
+                    data = recovered_fallback
+                else:
+                    raise rpc_error
+
+        # Handle list response
         if isinstance(data, list) and len(data) > 0:
             data = data[0]
             
-        # The RPC returns JSONB which is already a dict in Python
         if data and (data.get('status') == 'success' or data.get('status') == 'create_required'):
             
             # UPDATE PROFILE if name/phone provided
@@ -819,8 +857,6 @@ def create_establishment_admin(
                         profile_update['phone_number'] = request.phone_number
                     
                     print(f"Updating admin profile for {user_id}: {profile_update}")
-                    # Use supabase_admin to bypass RLS if needed, though profiles should be equitable by owner.
-                    # As this is a super admin operation, supabase_admin is improved.
                     supabase_admin.from_('profiles').update(profile_update).eq('id', user_id).execute()
                 except Exception as pe:
                     print(f"WARNING: Failed to update admin profile: {pe}")
@@ -835,12 +871,16 @@ def create_establishment_admin(
                 "rpc_response": data
             }
         else:
-            error_msg = data.get('message') if data else 'Unknown RPC handling error'
-            print(f"RPC Error Data: {data}")
-            raise HTTPException(status_code=500, detail=f"Failed to assign admin: {error_msg}")
-            
+             error_msg = data.get('message') if data else 'Unknown RPC handling error'
+             print(f"RPC Error Data: {data}")
+             raise HTTPException(status_code=500, detail=f"Failed to assign admin: {error_msg}")
+
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Error creating admin: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/establishment-admin/{establishment_id}")

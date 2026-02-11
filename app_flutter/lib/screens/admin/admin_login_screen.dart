@@ -9,6 +9,7 @@ import 'admin_dashboard_screen.dart';
 import 'super_admin_dashboard_screen.dart'; // [NEW]
 import '../../services/auth_service.dart';
 import '../auth/signup_screen.dart';
+import '../auth/change_password_screen.dart';
 import '../driver/driver_home_screen.dart';
 import '../main_screen.dart';
 
@@ -39,6 +40,21 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     if (session == null) {
       if (mounted) setState(() => _isCheckingSession = false);
       return;
+    }
+
+    // Check if password change is required
+    try {
+      final mustChange = await _supabase.rpc('check_password_change_required');
+      if (mustChange == true) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error checking password change requirement: $e');
     }
 
     // Has session, check role
