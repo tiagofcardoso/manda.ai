@@ -652,6 +652,33 @@ def accept_delivery(delivery_id: str, user = Depends(get_current_driver)):
         print(f"Error accepting delivery: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/driver/orders/{order_id}")
+def get_driver_order_details(order_id: str, user = Depends(get_current_driver)):
+    """Fetch complete order details including establishment and user info for drivers."""
+    if not supabase:
+         raise HTTPException(status_code=500, detail="Database error")
+    try:
+        # Fetch the order and items
+        order_res = supabase.table('orders').select('*, order_items(*, products(name))').eq('id', order_id).single().execute()
+        order = dict(order_res.data)
+
+        # Fetch establishment info
+        est_id = order.get('establishment_id')
+        if est_id:
+            est_res = supabase.table('establishments').select('*').eq('id', est_id).single().execute()
+            order['establishments'] = est_res.data if est_res.data else None
+            
+        # Fetch user profile info
+        user_id = order.get('user_id')
+        if user_id:
+            user_res = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+            order['profiles'] = user_res.data if user_res.data else None
+            
+        return order
+    except Exception as e:
+        print(f"Error fetching order details: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/admin/deliveries/simulate/{order_id}")
 async def simulate_delivery_endpoint(order_id: str):
     """Trigger the background simulation script for a specific order."""
