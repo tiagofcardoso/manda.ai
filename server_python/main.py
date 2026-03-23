@@ -600,9 +600,8 @@ def assign_delivery(req: DeliveryRequest, admin = Depends(get_current_admin)):
             "driver_name": req.driver_name, # Can be null
             "driver_id": req.driver_id,     # Can be null
             "status": status,
-            # Start at shop location (mock Lisbon)
-            "current_lat": 38.7223,
-            "current_lng": -9.1393 
+            "current_lat": None,
+            "current_lng": None
         }
         res = supabase.table('deliveries').insert(data).execute()
         return {"status": "success", "delivery_id": res.data[0]['id']}
