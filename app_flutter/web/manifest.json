@@ -1,11 +1,11 @@
 {
-    "name": "manda_client",
-    "short_name": "manda_client",
+    "name": "Manda.AI App",
+    "short_name": "Manda.AI",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#hex_code",
-    "theme_color": "#hex_code",
-    "description": "A new Flutter project.",
+    "background_color": "#ffffff",
+    "theme_color": "#d32f2f",
+    "description": "Manda.AI - Ecosystem for modern restaurants",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

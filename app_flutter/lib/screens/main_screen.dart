@@ -2,9 +2,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'menu_screen.dart';
 import 'order_tracking_screen.dart';
 import 'package:manda_client/services/app_translations.dart';
+import '../services/cart_service.dart';
 import '../widgets/app_drawer.dart';
 
 class MainScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  Map<String, dynamic>? _establishment;
 
   final List<Widget> _screens = [
     const MenuScreen(),
@@ -23,9 +26,46 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _fetchEstablishment();
+  }
+
+  Future<void> _fetchEstablishment() async {
+    final estId = CartService().establishmentId;
+    if (estId != null) {
+      try {
+        final res = await Supabase.instance.client
+            .from('establishments')
+            .select('name, type')
+            .eq('id', estId)
+            .maybeSingle();
+        if (mounted && res != null) {
+          setState(() {
+            _establishment = res;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error fetching establishment: $e');
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Theme awareness
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Dynamic label and icon based on business type
+    String docType = AppTranslations.of(context, 'menu');
+    IconData docIcon = LucideIcons.utensilsCrossed;
+    if (_establishment != null) {
+      final type = _establishment!['type'];
+      if (type != 'restaurant' && type != 'bars' && type != 'cafe') {
+        docType = AppTranslations.of(context, 'products'); // "Products"
+        docIcon = LucideIcons.shoppingBag;
+      }
+    }
 
     return Scaffold(
       extendBody: true, // Important for floating nav bar
@@ -70,8 +110,8 @@ class _MainScreenState extends State<MainScreen> {
                       children: [
                         _buildNavItem(
                           index: 0,
-                          icon: LucideIcons.utensilsCrossed,
-                          label: AppTranslations.of(context, 'menu'),
+                          icon: docIcon,
+                          label: docType,
                           isSelected: _currentIndex == 0,
                           isDark: isDark,
                         ),

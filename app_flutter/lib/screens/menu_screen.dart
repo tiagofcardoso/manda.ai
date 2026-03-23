@@ -36,15 +36,46 @@ class _MenuScreenState extends State<MenuScreen> {
   String _selectedCategory = 'all';
   String? _userRole;
   bool _isLoadingRole = true;
+  Map<String, dynamic>? _establishment;
+  List<Map<String, dynamic>> _dbCategories = [];
   late final StreamSubscription<AuthState> _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _fetchUserRole();
+    _fetchEstablishment();
     _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
       _fetchUserRole();
     });
+  }
+
+  Future<void> _fetchEstablishment() async {
+    final estId = _cartService.establishmentId;
+    if (estId != null) {
+      try {
+        final res = await _supabase
+            .from('establishments')
+            .select('name, type')
+            .eq('id', estId)
+            .maybeSingle();
+            
+        final catRes = await _supabase
+            .from('categories')
+            .select('id, name')
+            .eq('establishment_id', estId)
+            .order('sort_order', ascending: true);
+
+        if (mounted && res != null) {
+          setState(() {
+            _establishment = res;
+            _dbCategories = List<Map<String, dynamic>>.from(catRes);
+          });
+        }
+      } catch (e) {
+        debugPrint('Error fetching establishment: $e');
+      }
+    }
   }
 
   @override
@@ -364,10 +395,16 @@ class _MenuScreenState extends State<MenuScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(AppTranslations.of(context, 'menu'),
+            Text(
+                (_establishment != null &&
+                        _establishment!['type'] != 'restaurant' &&
+                        _establishment!['type'] != 'bars' &&
+                        _establishment!['type'] != 'cafe')
+                    ? AppTranslations.of(context, 'products')
+                    : AppTranslations.of(context, 'menu'),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             Text(
-              "Manda Burger Pub",
+              _establishment != null ? _establishment!['name'] ?? '' : '...',
               style: Theme.of(context).textTheme.bodySmall,
             )
           ],
@@ -422,21 +459,43 @@ class _MenuScreenState extends State<MenuScreen> {
 
           final allProducts = snapshot.data!;
 
-          // Create lookup map: UUID -> CategoryData
-          final categoryIdsMap = {
-            'all': APP_CATEGORIES['all']!,
-            for (var entry in APP_CATEGORIES.values)
-              if (entry['id'] != 'all') entry['id'] as String: entry
-          };
-
-          // Get available categories from products
-          final availableCategoryIds = {
-            'all',
+          // Get available product category IDs
+          final availableProductCatIds = {
             ...allProducts
                 .map((p) => p.categoryId)
-                .where((id) => id != null && categoryIdsMap.containsKey(id))
+                .where((id) => id != null)
                 .cast<String>()
           };
+
+          // Filter DB categories to only those with active products
+          final dbCatsWithProducts = _dbCategories
+              .where((c) => availableProductCatIds.contains(c['id']))
+              .toList();
+
+          // Build final list of tabs to render
+          final isEnglish = Localizations.localeOf(context).languageCode == 'en';
+          final List<Map<String, dynamic>> allCategoryTabs = [
+            {
+              'id': 'all',
+              'name': isEnglish ? 'All' : 'Todos',
+              'icon': LucideIcons.layoutGrid
+            },
+            ...dbCatsWithProducts.map((c) {
+              // Try to find matching icon from APP_CATEGORIES
+              IconData? matchedIcon;
+              for (var entry in APP_CATEGORIES.values) {
+                if (entry['id'] == c['id']) {
+                  matchedIcon = entry['icon'] as IconData?;
+                  break;
+                }
+              }
+              return {
+                'id': c['id'],
+                'name': c['name'],
+                'icon': matchedIcon ?? LucideIcons.tag,
+              };
+            })
+          ];
 
           final filteredProducts = _selectedCategory == 'all'
               ? allProducts
@@ -454,18 +513,13 @@ class _MenuScreenState extends State<MenuScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   scrollDirection: Axis.horizontal,
-                  itemCount: availableCategoryIds.length,
+                  itemCount: allCategoryTabs.length,
                   itemBuilder: (context, index) {
-                    final catId = availableCategoryIds.elementAt(index);
-                    final catData = categoryIdsMap[catId]!;
+                    final catData = allCategoryTabs[index];
+                    final catId = catData['id'] as String;
                     final isSelected = _selectedCategory == catId;
-
-                    // Dynamic Translation Logic
-                    final isEnglish =
-                        Localizations.localeOf(context).languageCode == 'en';
-                    final label = isEnglish
-                        ? (catData['en_label'] ?? catData['label'])
-                        : catData['label'];
+                    final label = catData['name'] as String;
+                    final icon = catData['icon'] as IconData;
 
                     return FadeInRight(
                       delay: Duration(milliseconds: index * 50),
@@ -505,7 +559,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                catData['icon'],
+                                icon,
                                 size: 20,
                                 color: isSelected
                                     ? (isDark

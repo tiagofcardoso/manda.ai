@@ -274,11 +274,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
       final street = est['street'];
       final city = est['city'];
+      final country = est['country'] ?? 'Brasil'; // Fallback to Brasil or keep dynamic
 
       if (street != null && city != null) {
         // 3. Geocode
         final addressQuery =
-            '$street, $city, Portugal'; // Assume Portugal for now
+            '$street, $city, $country'; 
         final url = Uri.parse(
             'https://nominatim.openstreetmap.org/search?q=$addressQuery&format=json&limit=1');
         final response = await http
