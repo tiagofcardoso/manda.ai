@@ -34,6 +34,7 @@ class DeliveryOrderRequest(BaseModel):
     total: float
     user_id: str
     delivery_address: str
+    establishment_id: str
     # No table_id allowed
 
 @app.post("/orders/table")
@@ -94,12 +95,11 @@ def place_delivery_order(order: DeliveryOrderRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
-    # 1. Validate Establishment (Default for now)
-    est_res = supabase.table("establishments").select("id").limit(1).execute()
-    establishment_id = est_res.data[0]['id'] if est_res.data else None
+    # 1. Validate Establishment
+    establishment_id = order.establishment_id
     
     if not establishment_id:
-         raise HTTPException(status_code=500, detail="No Establishment Configured")
+         raise HTTPException(status_code=400, detail="establishment_id is required for delivery orders")
 
     # 2. Create Order (Delivery)
     order_data = {
