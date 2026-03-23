@@ -79,8 +79,8 @@ def get_current_driver(user = Depends(get_current_user)):
                 detail="Driver privileges required"
             )
             
-        user.establishment_id = res.data.get('establishment_id')
-        return user
+        establishment_id = res.data.get('establishment_id')
+        return (user, establishment_id)
     except Exception as e:
         print(f"RBAC Error: {e}")
         if isinstance(e, HTTPException):

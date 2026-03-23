@@ -611,8 +611,9 @@ def assign_delivery(req: DeliveryRequest, admin = Depends(get_current_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/driver/deliveries/{delivery_id}/accept")
-def accept_delivery(delivery_id: str, user = Depends(get_current_driver)):
+def accept_delivery(delivery_id: str, auth_data = Depends(get_current_driver)):
     """Driver accepts an open delivery."""
+    user, establishment_id = auth_data  # Unpack tuple
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
@@ -653,8 +654,9 @@ def accept_delivery(delivery_id: str, user = Depends(get_current_driver)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/driver/orders/{order_id}")
-def get_driver_order_details(order_id: str, user = Depends(get_current_driver)):
+def get_driver_order_details(order_id: str, auth_data = Depends(get_current_driver)):
     """Fetch complete order details including establishment and user info for drivers."""
+    user, establishment_id = auth_data  # Unpack tuple
     if not supabase:
          raise HTTPException(status_code=500, detail="Database error")
     try:
