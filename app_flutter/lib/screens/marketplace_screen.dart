@@ -4,7 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import '../services/cart_service.dart';
-import 'menu_screen.dart';
+import 'main_screen.dart'; // Changed from menu_screen
 import '../services/app_translations.dart';
 
 class MarketplaceScreen extends StatefulWidget {
@@ -62,7 +62,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const MenuScreen()),
+      MaterialPageRoute(builder: (context) => const MainScreen()),
     );
   }
 

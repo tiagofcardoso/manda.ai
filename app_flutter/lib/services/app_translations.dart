@@ -262,6 +262,7 @@ class AppTranslations {
       'catPastry': 'Pastry',
       'catSeafood': 'Seafood',
       'catVegetarian': 'Vegetarian',
+      'statusDelivered': 'Delivered',
       // Password Change & Welcome
       'changePassword': 'Change Password',
       'newPassword': 'New Password',
@@ -558,6 +559,7 @@ class AppTranslations {
       'catPastry': 'Pastelaria',
       'catSeafood': 'Peixes',
       'catVegetarian': 'Vegetariana',
+      'statusDelivered': 'Entregue',
       // Password Change & Welcome
       'changePassword': 'Alterar Senha',
       'newPassword': 'Nova Senha',

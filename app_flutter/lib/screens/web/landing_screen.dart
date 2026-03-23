@@ -8,6 +8,7 @@ import 'dart:ui';
 import 'video_autoplay_widget.dart';
 import '../../services/app_translations.dart';
 import '../../services/locale_service.dart';
+import '../marketplace_screen.dart'; // [NEW]
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -150,8 +151,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     backgroundColor: _brandRed,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 18),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: isDesktop ? 24 : 16, 
+                        vertical: isDesktop ? 18 : 12),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
@@ -228,10 +230,9 @@ class _LandingScreenState extends State<LandingScreen> {
             ),
           ),
 
-          // 2. Overlay to ensure text readability
-          // Significantly reduced opacity to make images clearly visible (was 0.85)
+          // 2. Overlay to ensure text readability (Darker for white text)
           Container(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.black.withOpacity(0.5),
           ),
 
           // 3. Content
@@ -254,9 +255,9 @@ class _LandingScreenState extends State<LandingScreen> {
                             context, 'landingTitle'), // "Tudo pra facilitar..."
                         textAlign: TextAlign.center,
                         style: GoogleFonts.outfit(
-                          fontSize: isDesktop ? 64 : 42, // Increased Size
+                          fontSize: isDesktop ? 64 : 36, // Smaller for mobile
                           fontWeight: FontWeight.w800,
-                          color: _textDark,
+                          color: Colors.white,
                           height: 1.1,
                           letterSpacing: -1.0,
                         ),
@@ -274,9 +275,8 @@ class _LandingScreenState extends State<LandingScreen> {
                               'landingDesc'), // "O que você precisa está aqui..."
                           textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
-                            fontSize: 24, // Increased from 20
-                            color:
-                                Colors.grey[800], // Darker for better contrast
+                            fontSize: isDesktop ? 24 : 18, 
+                            color: Colors.white.withOpacity(0.9), 
                             fontWeight: FontWeight.w600,
                             height: 1.4,
                           ),
@@ -312,14 +312,17 @@ class _LandingScreenState extends State<LandingScreen> {
                     Expanded(
                         child: FadeInLeft(
                       delay: const Duration(milliseconds: 600),
-                      child: _HoverScaleCard(
-                        child: _buildBigCard(
-                          title: AppTranslations.of(context, 'restaurant'),
-                          label: AppTranslations.of(context, 'viewOptions'),
-                          color: _brandRed,
-                          icon: LucideIcons.utensils,
-                          imageAsset:
-                              'assets/images/barca_sushi.png', // Sushi Boat
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
+                        child: _HoverScaleCard(
+                          child: _buildBigCard(
+                            title: AppTranslations.of(context, 'restaurant'),
+                            label: AppTranslations.of(context, 'viewOptions'),
+                            color: _brandRed,
+                            icon: LucideIcons.utensils,
+                            imageAsset:
+                                'assets/images/barca_sushi.png', // Sushi Boat
+                          ),
                         ),
                       ),
                     )),
@@ -327,16 +330,19 @@ class _LandingScreenState extends State<LandingScreen> {
                     Expanded(
                         child: FadeInRight(
                       delay: const Duration(milliseconds: 600),
-                      child: _HoverScaleCard(
-                        child: _buildBigCard(
-                          title: AppTranslations.of(context, 'market'),
-                          label: AppTranslations.of(context, 'browseStores'),
-                          color: const Color(0xFFB5D040), // Lime Green
-                          textColor: const Color(0xFF3F3F3F),
-                          icon: LucideIcons.shoppingBag,
-                          overlayColor: Colors.white.withOpacity(0.3),
-                          imageAsset:
-                              'assets/images/mercado.png', // Market Image
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
+                        child: _HoverScaleCard(
+                          child: _buildBigCard(
+                            title: AppTranslations.of(context, 'market'),
+                            label: AppTranslations.of(context, 'browseStores'),
+                            color: const Color(0xFFB5D040), // Lime Green
+                            textColor: const Color(0xFF3F3F3F),
+                            icon: LucideIcons.shoppingBag,
+                            overlayColor: Colors.white.withOpacity(0.3),
+                            imageAsset:
+                                'assets/images/mercado.png', // Market Image
+                          ),
                         ),
                       ),
                     )),
@@ -344,21 +350,27 @@ class _LandingScreenState extends State<LandingScreen> {
                 )
               : Column(
                   children: [
-                    _buildBigCard(
-                      title: AppTranslations.of(context, 'restaurant'),
-                      label: AppTranslations.of(context, 'viewOptions'),
-                      color: _brandRed,
-                      icon: LucideIcons.utensils,
-                      imageAsset: 'assets/images/barca_sushi.png',
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
+                      child: _buildBigCard(
+                        title: AppTranslations.of(context, 'restaurant'),
+                        label: AppTranslations.of(context, 'viewOptions'),
+                        color: _brandRed,
+                        icon: LucideIcons.utensils,
+                        imageAsset: 'assets/images/barca_sushi.png',
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    _buildBigCard(
-                      title: AppTranslations.of(context, 'market'),
-                      label: AppTranslations.of(context, 'browseStores'),
-                      color: const Color(0xFFB5D040),
-                      textColor: const Color(0xFF3F3F3F),
-                      icon: LucideIcons.shoppingBag,
-                      imageAsset: 'assets/images/mercado.png',
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
+                      child: _buildBigCard(
+                        title: AppTranslations.of(context, 'market'),
+                        label: AppTranslations.of(context, 'browseStores'),
+                        color: const Color(0xFFB5D040),
+                        textColor: const Color(0xFF3F3F3F),
+                        icon: LucideIcons.shoppingBag,
+                        imageAsset: 'assets/images/mercado.png',
+                      ),
                     ),
                   ],
                 ),
@@ -533,7 +545,7 @@ class _LandingScreenState extends State<LandingScreen> {
         child: Container(
           width: double.infinity,
           constraints: const BoxConstraints(maxWidth: 1000),
-          padding: const EdgeInsets.all(48),
+          padding: EdgeInsets.all(isDesktop ? 48 : 24),
           decoration: BoxDecoration(
             color: _textDark,
             borderRadius: BorderRadius.circular(32),
@@ -547,19 +559,19 @@ class _LandingScreenState extends State<LandingScreen> {
                     Text("Entrega Ágil e Transparente",
                         style: GoogleFonts.outfit(
                             color: Colors.white,
-                            fontSize: 40,
+                            fontSize: isDesktop ? 40 : 28,
                             fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                         "Da cozinha até sua porta, acompanhe sua entrega em tempo real com nossa frota dedicada.",
-                        style: TextStyle(color: Colors.grey, fontSize: 18)),
+                        style: TextStyle(color: Colors.grey, fontSize: isDesktop ? 18 : 16)),
                     const SizedBox(height: 32),
                     Wrap(
                       spacing: 16,
                       runSpacing: 16,
                       children: [
-                        _buildStoreBadge(LucideIcons.apple, "App Store"),
-                        _buildStoreBadge(LucideIcons.play, "Google Play"),
+                        _buildStoreBadge(context, LucideIcons.apple, "App Store"),
+                        _buildStoreBadge(context, LucideIcons.play, "Google Play"),
                       ],
                     )
                   ],
@@ -582,22 +594,67 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-  Widget _buildStoreBadge(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+  Widget _buildStoreBadge(BuildContext context, IconData icon, String text) {
+    return InkWell(
+      onTap: () => _showInstallInstructions(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _textDark),
+            const SizedBox(width: 8),
+            Text(text,
+                style: TextStyle(color: _textDark, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: _textDark),
-          const SizedBox(width: 8),
-          Text(text,
-              style: TextStyle(color: _textDark, fontWeight: FontWeight.bold)),
-        ],
-      ),
+    );
+  }
+
+  void _showInstallInstructions(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(LucideIcons.download, color: _brandRed),
+              const SizedBox(width: 8),
+              const Text("Instalar App"),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("O Manda.AI é um Web App leve e rápido! Instale direto no seu celular:", style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 24),
+              const Text("🍏 No iPhone/iPad (Safari):", style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              const Text("1. Toque no ícone de Compartilhar (baixo da tela)."),
+              const Text("2. Selecione 'Adicionar à Tela de Início'."),
+              const SizedBox(height: 16),
+              const Text("🤖 No Android (Chrome):", style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              const Text("1. Toque nos 3 pontinhos ⋮ (canto superior direito)."),
+              const Text("2. Selecione 'Instalar aplicativo' ou 'Adicionar à tela de início'."),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text("Entendi", style: TextStyle(fontWeight: FontWeight.bold, color: _brandRed)),
+            ),
+          ],
+        );
+      },
     );
   }
 

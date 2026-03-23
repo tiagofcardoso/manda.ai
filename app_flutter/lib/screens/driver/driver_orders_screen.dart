@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart'; // [NEW] Linker
 import '../../constants/api.dart';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
 import '../../services/auth_service.dart';
@@ -231,45 +232,33 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
     }
 
     try {
-      // 1. Update Delivery Status
-      await _supabase
-          .from('deliveries')
-          .update({'status': newStatus}).eq('id', deliveryId);
+      final session = _supabase.auth.currentSession;
+      if (session == null) return;
 
-      // 2. If Delivered, Update Order Status (to remove from Active list)
-      if (newStatus == 'delivered') {
-        await _supabase
-            .from('orders')
-            .update({'status': 'delivered'}).eq('id', orderId);
+      final url = Uri.parse('${ApiConstants.baseUrl}/driver/deliveries/$deliveryId/status');
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'status': newStatus,
+          'order_id': orderId,
+        }),
+      );
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Delivery Completed! 🎉'),
-                backgroundColor: Colors.green),
-          );
-        }
-      } else if (newStatus == 'in_progress') {
-        // [NEW] Update Order Status to 'on_way' so client sees status change
-        await _supabase
-            .from('orders')
-            .update({'status': 'on_way'}).eq('id', orderId);
-
+      if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Status updated: $newStatus 🚀'),
-                backgroundColor: Colors.blue),
+              content: Text(newStatus == 'delivered' ? 'Delivery Completed! 🎉' : 'Status updated: $newStatus 🚀'),
+              backgroundColor: newStatus == 'delivered' ? Colors.green : Colors.blue,
+            ),
           );
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Status updated: $newStatus 🚀'),
-                backgroundColor: Colors.blue),
-          );
-        }
+        throw Exception('Failed to update status server: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (mounted) {
@@ -284,54 +273,23 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
 
   Future<Map<String, dynamic>?> _fetchOrderDetails(String orderId) async {
     try {
-      // [UPDATED] 1. Fetch Order + Items
-      // We use Supabase efficient joining
-      // Note: adjust syntax if "products" are not directly related to order_items in your Supabase setup
-      // (but assuming they are based on main.py)
-      final order = await _supabase
-          .from('orders')
-          .select('*, order_items(*, products(name))')
-          .eq('id', orderId)
-          .single();
+      final session = _supabase.auth.currentSession;
+      if (session == null) return {'debug_error': 'No active session'};
+      
+      final url = Uri.parse('${ApiConstants.baseUrl}/driver/orders/$orderId');
+      final response = await http.get(url, headers: {
+        'Authorization': 'Bearer ${session.accessToken}',
+        'Content-Type': 'application/json',
+      });
 
-      Map<String, dynamic>? profile;
-      Map<String, dynamic>? establishment;
-
-      // 2. Fetch Profile (Client) if needed
-      if (order['user_id'] != null) {
-        try {
-          profile = await _supabase
-              .from('profiles')
-              .select()
-              .eq('id', order['user_id'])
-              .single();
-        } catch (e) {
-          debugPrint('Profile fetch error: $e');
-        }
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('Error fetching order details via backend: ${response.statusCode} - ${response.body}');
+        return {'debug_error': response.body};
       }
-
-      // 3. Fetch Establishment
-      if (order['establishment_id'] != null) {
-        try {
-          establishment = await _supabase
-              .from('establishments')
-              .select()
-              .eq('id', order['establishment_id'])
-              .single();
-        } catch (e) {
-          debugPrint('Establishment fetch error: $e');
-        }
-      }
-
-      // Merge and return
-      return {
-        ...order,
-        'profiles': profile,
-        'establishments': establishment,
-        'debug_error': null,
-      };
     } catch (e) {
-      debugPrint('Error fetching order details: $e');
+      debugPrint('Error fetching order details via HTTP: $e');
       return {'debug_error': e.toString()};
     }
   }

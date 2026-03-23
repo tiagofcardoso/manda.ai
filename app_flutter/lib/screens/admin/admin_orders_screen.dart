@@ -167,8 +167,42 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _OrderDetailSheet(order: order),
+      builder: (context) => _OrderDetailSheet(
+        order: order,
+        onStatusChange: (orderId, newStatus) {
+          Navigator.pop(context); // Close sheet
+          _updateOrderStatus(orderId, newStatus);
+        },
+      ),
     );
+  }
+
+  Future<void> _updateOrderStatus(String orderId, String newStatus) async {
+    try {
+      await _supabase
+          .from('orders')
+          .update({'status': newStatus})
+          .eq('id', orderId);
+          
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppTranslations.of(context, 'orderUpdated') + ' $newStatus'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadOrders();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${AppTranslations.of(context, 'errorUpdatingStatus')} $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -500,8 +534,57 @@ class _OrderCard extends StatelessWidget {
 
 class _OrderDetailSheet extends StatelessWidget {
   final Map<String, dynamic> order;
+  final Function(String orderId, String newStatus) onStatusChange;
 
-  const _OrderDetailSheet({required this.order});
+  const _OrderDetailSheet({required this.order, required this.onStatusChange});
+
+  Widget _buildActionButtons(BuildContext context) {
+    final status = order['status'].toString();
+    final orderId = order['id'].toString();
+    final orderType = order['order_type'].toString();
+    
+    // Determine which buttons to show based on status
+    if (status == 'pending') {
+      return ElevatedButton.icon(
+        onPressed: () => onStatusChange(orderId, 'prep'),
+        icon: const Icon(LucideIcons.chefHat),
+        label: Text(AppTranslations.of(context, 'startPreparing')),
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+      );
+    } else if (status == 'prep') {
+      return ElevatedButton.icon(
+        onPressed: () => onStatusChange(orderId, 'ready'),
+        icon: const Icon(LucideIcons.checkCircle),
+        label: Text(AppTranslations.of(context, 'markAsReady')),
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+      );
+    } else if (status == 'ready') {
+      if (orderType == 'delivery') {
+        return ElevatedButton.icon(
+          onPressed: () => onStatusChange(orderId, 'on_way'),
+          icon: const Icon(LucideIcons.bike),
+          label: const Text('Dispatch for Delivery'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+        );
+      } else {
+        return ElevatedButton.icon(
+          onPressed: () => onStatusChange(orderId, 'completed'),
+          icon: const Icon(LucideIcons.checkCheck),
+          label: const Text('Complete Order'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], foregroundColor: Colors.white),
+        );
+      }
+    } else if (status == 'on_way') {
+      return ElevatedButton.icon(
+        onPressed: () => onStatusChange(orderId, 'delivered'),
+        icon: const Icon(LucideIcons.packageCheck),
+        label: const Text('Mark as Delivered'),
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], foregroundColor: Colors.white),
+      );
+    }
+    
+    return const SizedBox.shrink(); // No actions for delivered/completed
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -552,6 +635,15 @@ class _OrderDetailSheet extends StatelessWidget {
                 ),
               ),
               const Divider(),
+              // Action Buttons
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SizedBox(
+                   width: double.infinity,
+                   height: 50,
+                   child: _buildActionButtons(context),
+                ),
+              ),
               // Items List
               Expanded(
                 child: ListView.builder(

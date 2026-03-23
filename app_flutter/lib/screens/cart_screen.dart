@@ -217,23 +217,43 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
       }
 
       // 2. Determine Address
+      // Note: profile_screen saves address as nested JSON in 'address' column
       String deliveryAddress = '';
       try {
         final profile = await Supabase.instance.client
             .from('profiles')
-            .select('street, city, zip_code')
+            .select('address, street, city, zip_code')
             .eq('id', user.id)
             .single();
 
-        final street = profile['street'] ?? '';
-        final city = profile['city'] ?? '';
+        // Try nested 'address' JSON first (new format from profile_screen.dart)
+        String street = '';
+        String number = '';
+        String complement = '';
+        String city = '';
 
-        if (street.toString().trim().isEmpty) {
+        final addressJson = profile['address'];
+        if (addressJson != null && addressJson is Map) {
+          street = (addressJson['street'] ?? '').toString();
+          number = (addressJson['number'] ?? '').toString();
+          complement = (addressJson['complement'] ?? '').toString();
+          city = (addressJson['city'] ?? '').toString();
+        } else {
+          // Fallback to flat columns (legacy)
+          street = (profile['street'] ?? '').toString();
+          city = (profile['city'] ?? '').toString();
+        }
+
+        if (street.trim().isEmpty) {
           throw Exception(
               'Please update your address in Profile before ordering.');
         }
 
-        deliveryAddress = '$street, $city';
+        List<String> addrParts = [street];
+        if (number.isNotEmpty) addrParts.add('nº $number');
+        if (complement.isNotEmpty) addrParts.add('- $complement');
+
+        deliveryAddress = '${addrParts.join(' ')}, $city';
       } catch (e) {
         if (e.toString().contains('Please update')) rethrow;
         deliveryAddress = 'Address not found';
@@ -241,6 +261,7 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
 
       final payload = {
         "user_id": user.id,
+        "establishment_id": widget.cartService.establishmentId, // [FIX] Required for admin order visibility
         "total": widget.cartService.totalAmount,
         "delivery_address": deliveryAddress,
         "items": widget.cartService.items

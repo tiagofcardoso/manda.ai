@@ -681,6 +681,33 @@ def get_driver_order_details(order_id: str, auth_data = Depends(get_current_driv
         print(f"Error fetching order details: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/driver/deliveries/{delivery_id}/status")
+def update_delivery_status(delivery_id: str, payload: dict, auth_data = Depends(get_current_driver)):
+    """Update delivery status and its corresponding order status."""
+    user, establishment_id = auth_data
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    new_status = payload.get("status")
+    order_id = payload.get("order_id")
+
+    if new_status not in ["in_progress", "delivered"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    try:
+        # 1. Update delivery table
+        supabase.table("deliveries").update({"status": new_status}).eq("id", delivery_id).execute()
+
+        # 2. Update order table
+        order_status = "on_way" if new_status == "in_progress" else "delivered"
+        if order_id:
+            supabase.table("orders").update({"status": order_status}).eq("id", order_id).execute()
+
+        return {"status": "success", "message": f"Status updated to {new_status}"}
+    except Exception as e:
+        print(f"Error updating status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/admin/deliveries/simulate/{order_id}")
 async def simulate_delivery_endpoint(order_id: str):
     """Trigger the background simulation script for a specific order."""

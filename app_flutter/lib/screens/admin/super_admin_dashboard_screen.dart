@@ -11,6 +11,7 @@ import 'admin_login_screen.dart';
 import 'admin_dashboard_screen.dart';
 import '../../widgets/admin/admin_centered_layout.dart';
 import 'establishment_editor_screen_modern.dart';
+import '../../constants/api.dart';
 import '../../services/app_translations.dart';
 
 class SuperAdminDashboardScreen extends StatefulWidget {
@@ -145,7 +146,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
       // Call Backend to delete safely (bypassing RLS)
       final response = await http.delete(
-        Uri.parse('http://localhost:8000/admin/establishments/$id'),
+        Uri.parse('${ApiConstants.baseUrl}/admin/establishments/$id'),
         headers: {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',

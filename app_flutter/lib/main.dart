@@ -42,7 +42,8 @@ Future<void> main() async {
   await OrderService().init();
 
   // Initialize Localization (Saved Pref > Geolocation)
-  await LocaleService().init();
+  // Fire and forget to avoid blocking runApp due to web location permission prompt!
+  LocaleService().init();
 
   // Initialize Settings (Currency)
   await SettingsService().loadCurrency();

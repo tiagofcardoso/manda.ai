@@ -112,11 +112,59 @@ class AdminScaffold extends StatelessWidget {
   }
 }
 
-class _AdminSidebar extends StatelessWidget {
+class _AdminSidebar extends StatefulWidget {
   final bool isMobile;
   final String activeRoute;
 
   const _AdminSidebar({required this.isMobile, required this.activeRoute});
+
+  @override
+  State<_AdminSidebar> createState() => _AdminSidebarState();
+}
+
+class _AdminSidebarState extends State<_AdminSidebar> {
+  String? _establishmentType;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEstablishmentType();
+  }
+
+  Future<void> _fetchEstablishmentType() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final profile = await supabase
+          .from('profiles')
+          .select('establishment_id')
+          .eq('id', user.id)
+          .single();
+
+      final estId = profile['establishment_id'];
+      if (estId == null) return;
+
+      final est = await supabase
+          .from('establishments')
+          .select('type')
+          .eq('id', estId)
+          .single();
+
+      if (mounted) {
+        setState(() => _establishmentType = est['type']?.toString().toLowerCase());
+      }
+    } catch (e) {
+      debugPrint('Could not fetch establishment type: $e');
+    }
+  }
+
+  bool get _showKDS {
+    // Show KDS only for restaurant/food/drinks types
+    const kitchenTypes = {'restaurant', 'food', 'drinks', 'bar', 'cafe', 'bakery'};
+    return _establishmentType == null || kitchenTypes.contains(_establishmentType);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,11 +175,11 @@ class _AdminSidebar extends StatelessWidget {
           children: [
             // Logo Area
             Container(
-              height: isMobile ? 150 : 80,
-              alignment: isMobile ? Alignment.center : Alignment.centerLeft,
+              height: widget.isMobile ? 150 : 80,
+              alignment: widget.isMobile ? Alignment.center : Alignment.centerLeft,
               padding: const EdgeInsets.all(24),
               child: Row(
-                mainAxisAlignment: isMobile
+                mainAxisAlignment: widget.isMobile
                     ? MainAxisAlignment.center
                     : MainAxisAlignment.start,
                 children: [
@@ -150,7 +198,7 @@ class _AdminSidebar extends StatelessWidget {
               ),
             ),
 
-            if (isMobile) const Divider(),
+            if (widget.isMobile) const Divider(),
 
             // Menu Items
             Expanded(
@@ -163,18 +211,20 @@ class _AdminSidebar extends StatelessWidget {
                       'Dashboard',
                       LucideIcons.layoutDashboard,
                       '/admin-dashboard',
-                      activeRoute == '/admin-dashboard'),
+                      widget.activeRoute == '/admin-dashboard'),
                   _buildMenuItem(context, 'Pedidos', LucideIcons.shoppingBag,
-                      '/admin-orders', activeRoute == '/admin-orders'),
+                      '/admin-orders', widget.activeRoute == '/admin-orders'),
                   _buildMenuItem(context, 'Produtos', LucideIcons.utensils,
-                      '/admin-products', activeRoute == '/admin-products'),
+                      '/admin-products', widget.activeRoute == '/admin-products'),
                   _buildMenuItem(context, 'Vendas', LucideIcons.barChart2,
-                      '/admin-sales', activeRoute == '/admin-sales'),
+                      '/admin-sales', widget.activeRoute == '/admin-sales'),
                   const Divider(height: 32),
-                  _buildMenuItem(context, 'Cozinha (KDS)', LucideIcons.monitor,
-                      '/kitchen', activeRoute == '/kitchen'),
+                  // KDS only for restaurant/drinks type establishments
+                  if (_showKDS)
+                    _buildMenuItem(context, 'Cozinha (KDS)', LucideIcons.monitor,
+                        '/kitchen', widget.activeRoute == '/kitchen'),
                   _buildMenuItem(context, 'Configurações', LucideIcons.settings,
-                      '/settings', activeRoute == '/settings'),
+                      '/settings', widget.activeRoute == '/settings'),
                 ],
               ),
             ),
@@ -212,7 +262,7 @@ class _AdminSidebar extends StatelessWidget {
           : Colors.transparent,
       onTap: () async {
         if (isActive) {
-          if (isMobile) {
+          if (widget.isMobile) {
             Navigator.pop(context); // Close drawer if already on page
           }
           return;

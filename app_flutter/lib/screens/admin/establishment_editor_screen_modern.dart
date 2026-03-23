@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../constants/api.dart';
 import '../../services/app_translations.dart';
 import '../../widgets/admin/admin_centered_layout.dart';
 import '../../widgets/admin/admin_form_fields.dart';
@@ -111,7 +112,7 @@ class _EstablishmentEditorScreenModernState
 
       final response = await http.get(
         Uri.parse(
-            'http://localhost:8000/admin/establishment-admin/$establishmentId'),
+            '${ApiConstants.baseUrl}/admin/establishment-admin/$establishmentId'),
         headers: {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
@@ -258,7 +259,7 @@ class _EstablishmentEditorScreenModernState
 
       // Call backend endpoint to create/assign admin
       final response = await http.post(
-        Uri.parse('http://localhost:8000/admin/create-establishment-admin'),
+        Uri.parse('${ApiConstants.baseUrl}/admin/create-establishment-admin'),
         headers: {
           'Authorization': 'Bearer ${session.accessToken}',
           'Content-Type': 'application/json',
