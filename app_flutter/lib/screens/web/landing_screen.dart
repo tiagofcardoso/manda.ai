@@ -8,7 +8,9 @@ import 'dart:ui';
 import 'video_autoplay_widget.dart';
 import '../../services/app_translations.dart';
 import '../../services/locale_service.dart';
-import '../marketplace_screen.dart'; // [NEW]
+import '../marketplace_screen.dart';
+import '../main_screen.dart';
+import '../../services/cart_service.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -34,6 +36,23 @@ class _LandingScreenState extends State<LandingScreen> {
         setState(() => _isScrolled = true);
       } else if (_scrollController.offset <= 20 && _isScrolled) {
         setState(() => _isScrolled = false);
+      }
+    });
+
+    // Check URL parameters for QR Table Code
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final uri = Uri.base;
+      if (uri.queryParameters.containsKey('est') &&
+          uri.queryParameters.containsKey('table')) {
+        final estId = uri.queryParameters['est']!;
+        final tableNum = uri.queryParameters['table']!;
+
+        // Auto-login to table context
+        CartService().setEstablishmentId(estId);
+        CartService().setTableId(tableNum, explicit: true);
+
+        // Show PWA install prompt then navigate directly
+        _showInstallInstructions(context, thenNavigate: true);
       }
     });
   }
@@ -617,9 +636,10 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-  void _showInstallInstructions(BuildContext context) {
+  void _showInstallInstructions(BuildContext context, {bool thenNavigate = false}) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -649,8 +669,16 @@ class _LandingScreenState extends State<LandingScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text("Entendi", style: TextStyle(fontWeight: FontWeight.bold, color: _brandRed)),
+              onPressed: () {
+                Navigator.of(context).pop();
+                if (thenNavigate) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MainScreen()),
+                  );
+                }
+              },
+              child: Text("Entendi / Continuar", style: TextStyle(fontWeight: FontWeight.bold, color: _brandRed)),
             ),
           ],
         );

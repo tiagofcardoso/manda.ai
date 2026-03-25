@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -153,10 +152,7 @@ class _AdminTablesScreenState extends State<AdminTablesScreen> {
 
   Future<void> _printQR(Map<String, dynamic> table) async {
     final tableNumber = table['table_number'];
-    final qrData = jsonEncode({
-      'establishment_id': _establishmentId,
-      'table_number': tableNumber,
-    });
+    final qrData = 'https://mandaai-c52e9.web.app/#/?est=$_establishmentId&table=$tableNumber';
 
     try {
       await Printing.layoutPdf(
@@ -320,10 +316,7 @@ class _AdminTablesScreenState extends State<AdminTablesScreen> {
 
   Widget _buildTableCard(Map<String, dynamic> table) {
     final tableNumber = table['table_number'];
-    final qrData = jsonEncode({
-      'establishment_id': _establishmentId,
-      'table_number': tableNumber,
-    });
+    final qrData = 'https://mandaai-c52e9.web.app/#/?est=$_establishmentId&table=$tableNumber';
 
     return Card(
       elevation: 2,

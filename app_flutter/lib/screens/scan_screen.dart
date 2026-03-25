@@ -27,6 +27,31 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future<void> _processScan(String code) async {
     try {
+      // NEW: Detect URL-based QR Code (new format)
+      if (code.startsWith('http') && code.contains('est=') && code.contains('table=')) {
+        final uri = Uri.tryParse(code.replaceFirst('/#/', '/'));
+        final estId = uri?.queryParameters['est'];
+        final tableNum = uri?.queryParameters['table'];
+
+        if (estId != null && tableNum != null) {
+          await CartService().setTableId(tableNum, explicit: true, establishmentId: estId);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${AppTranslations.of(context, 'table')} $tableNum ${AppTranslations.of(context, 'tableConfirmed')}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+            );
+          }
+          return;
+        }
+      }
+
       Map<String, dynamic>? response;
 
       // Only try querying by ID if it looks like a UUID (32+ chars)
