@@ -91,7 +91,7 @@ class MandaApp extends StatelessWidget {
                 darkTheme: AppTheme.darkTheme,
                 themeMode: ThemeService().getEffectiveThemeMode(),
                 home: kIsWeb
-                    ? const web_landing.LandingScreen()
+                    ? _webHome()
                     : const mobile_landing.LandingScreen(),
                 routes: {
                   '/login': (context) => const mobile_landing.LandingScreen(),
@@ -104,5 +104,15 @@ class MandaApp extends StatelessWidget {
             });
       },
     );
+  }
+  /// On web: mobile screens (PWA) → mobile landing, desktop → web marketing
+  static Widget _webHome() {
+    // Use physical screen width to detect mobile at startup
+    final width = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize.width /
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    if (width < 700) {
+      return const mobile_landing.LandingScreen();
+    }
+    return const web_landing.LandingScreen();
   }
 }
