@@ -12,6 +12,7 @@ import '../utils/image_helper.dart';
 import '../constants/api.dart';
 
 import '../widgets/admin/admin_scaffold.dart';
+import '../services/printer_service.dart';
 import '../utils/responsive.dart';
 
 class KitchenScreen extends StatefulWidget {
@@ -520,11 +521,25 @@ class _OrderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  timeStr,
-                  style: TextStyle(
-                      color: textColor?.withOpacity(0.7),
-                      fontWeight: FontWeight.bold),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(LucideIcons.printer, color: textColor, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        PrinterService().printOrder(order, 'Cozinha - Manda.AI');
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                          color: textColor?.withOpacity(0.7),
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -60,9 +60,11 @@ dependencies:
   carousel_slider: ^5.1.1
   animate_do: ^3.3.4
   video_player: ^2.9.0
+  qr_flutter: ^4.1.0      # QR code widget
+  pdf: ^3.11.0            # PDF generation
+  printing: ^5.13.0       # Print/share PDF (web + mobile)
+  flutter_thermal_printer_pos: ^0.0.4
 
-
-# ...
 
 
 

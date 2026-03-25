@@ -12,7 +12,7 @@ import '../auth/signup_screen.dart';
 import '../auth/change_password_screen.dart';
 import '../driver/driver_home_screen.dart';
 import '../main_screen.dart';
-import '../marketplace_screen.dart'; // [NEW]
+import '../landing_screen.dart' as client_landing; // Splash for clients
 import '../../services/cart_service.dart'; // [NEW]
 
 class AdminLoginScreen extends StatefulWidget {
@@ -81,7 +81,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       final isTableMode = CartService().tableId != null;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => isTableMode ? const MainScreen() : const MarketplaceScreen()),
+        MaterialPageRoute(
+          builder: (context) => isTableMode
+              ? const MainScreen()
+              : const client_landing.LandingScreen(),
+        ),
       );
     } else {
       if (role == 'admin' || role == 'kitchen' || role == 'manager') {

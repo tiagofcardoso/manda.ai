@@ -266,7 +266,11 @@ class _MenuScreenState extends State<MenuScreen> {
               onTap: () => Navigator.pop(context),
             ),
 
-            if (!isTableMode && !kIsWeb)
+            // Only show Scan QR for restaurant/bar/cafe types
+            if (!isTableMode &&
+                (_establishment?['type'] == 'restaurant' ||
+                    _establishment?['type'] == 'bars' ||
+                    _establishment?['type'] == 'cafe'))
               ListTile(
                 leading: Icon(LucideIcons.qrCode,
                     color: isDark ? Colors.white : Colors.black),

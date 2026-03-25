@@ -13,7 +13,10 @@ import 'admin_products_screen.dart';
 import 'admin_sales_screen.dart';
 import 'admin_orders_screen.dart';
 import '../kitchen_screen.dart';
+import 'admin_tables_screen.dart';
 import '../../widgets/admin/admin_scaffold.dart';
+import '../menu_screen.dart';
+import '../../services/cart_service.dart';
 
 import '../../utils/responsive.dart';
 
@@ -34,10 +37,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   Timer? _refreshTimer;
 
-  // Super Admin Context
   bool _isSuperAdmin = false;
   String? _establishmentName;
-  // String? _establishmentId; // Unused
+  String? _establishmentId;
 
   @override
   void initState() {
@@ -99,29 +101,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       // Fetch user profile to check role and establishment_id
       final response = await supabase
           .from('profiles')
-          .select('role, establishment_id, establishments(name)')
+          .select('role, establishment_id, establishments(name, type)')
           .eq('id', userId)
           .single();
 
       final role = response['role'];
       final establishmentId = response['establishment_id'];
 
-      // If super_admin with establishment_id set, they're impersonating
-      if (role == 'super_admin' && establishmentId != null) {
-        if (mounted) {
-          setState(() {
-            _isSuperAdmin = true;
-            // _establishmentId = establishmentId; // Unused
+      if (mounted) {
+        setState(() {
+          _establishmentId = establishmentId;
+          if (response['establishments'] != null) {
+            _establishmentName = response['establishments']['name'];
+          }
 
-            // Get establishment name
-            if (response['establishments'] != null) {
-              _establishmentName = response['establishments']['name'];
-            }
-          });
-        }
+          if (role == 'super_admin' && establishmentId != null) {
+            _isSuperAdmin = true;
+          }
+        });
       }
     } catch (e) {
-      debugPrint('Error checking super admin context: $e');
+      debugPrint('Error checking admin context: $e');
     }
   }
 
@@ -401,6 +401,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       MaterialPageRoute(
                           builder: (context) => const KitchenScreen())),
                 ),
+                if (_establishmentId != null)
+                  _buildActionCard(
+                    context,
+                    'Mesas & QR',
+                    LucideIcons.qrCode,
+                    Colors.teal,
+                    () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const AdminTablesScreen())),
+                  ),
+                if (_establishmentId != null)
+                  _buildActionCard(
+                    context,
+                    'Ver Cardápio',
+                    LucideIcons.store,
+                    Colors.indigo,
+                    () async {
+                      await CartService().setEstablishmentId(_establishmentId!);
+                      if (context.mounted) {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const MenuScreen()));
+                      }
+                    },
+                  ),
               ],
             ),
           ],

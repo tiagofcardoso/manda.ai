@@ -6,6 +6,7 @@ import '../../services/admin_service.dart';
 import '../../services/app_translations.dart';
 import '../../utils/image_helper.dart';
 import '../../widgets/admin/admin_scaffold.dart';
+import '../../services/printer_service.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -513,6 +514,12 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
+                    IconButton(
+                      icon: Icon(LucideIcons.printer, color: textColor?.withOpacity(0.8), size: 20),
+                      onPressed: () {
+                         PrinterService().printOrder(order, 'Manda.AI');
+                      },
+                    ),
                     Text(
                       NumberFormat.currency(symbol: '€').format(total),
                       style: const TextStyle(

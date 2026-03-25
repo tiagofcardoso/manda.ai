@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
@@ -26,6 +26,7 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   String? _role;
   String? _email;
+  String? _establishmentType;
   bool _isLoading = true;
 
   @override
@@ -38,10 +39,26 @@ class _AppDrawerState extends State<AppDrawer> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
       final role = await AuthService().getUserRole();
+
+      // Fetch active establishment type
+      final estId = CartService().establishmentId;
+      String? estType;
+      if (estId != null) {
+        try {
+          final est = await Supabase.instance.client
+              .from('establishments')
+              .select('type')
+              .eq('id', estId)
+              .maybeSingle();
+          estType = est?['type'];
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           _role = role;
           _email = user.email;
+          _establishmentType = estType;
           _isLoading = false;
         });
       }
@@ -172,8 +189,11 @@ class _AppDrawerState extends State<AppDrawer> {
                           onTap: () => _navigateTo(const ProfileScreen()),
                         ),
 
-                      // Scan QR (Clients Only) - Mobile Only
-                      if ((_role == 'client' || _role == null) && !kIsWeb)
+                      // Show Scan QR for clients/guests at restaurant/bar/cafe only
+                      if ((_role == 'client' || _role == null) &&
+                          (_establishmentType == 'restaurant' ||
+                              _establishmentType == 'bars' ||
+                              _establishmentType == 'cafe'))
                         ListTile(
                           leading: const Icon(LucideIcons.qrCode),
                           title: Text(AppTranslations.of(context, 'scanTable')),
