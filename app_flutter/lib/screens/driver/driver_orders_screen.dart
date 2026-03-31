@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart'; // [NEW] Linker
 import '../../constants/api.dart';
+import '../../constants/admin_theme.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
@@ -297,23 +298,25 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AdminTheme.bgColor,
       drawer: const AppDrawer(), // [NEW] Side Menu
       appBar: AppBar(
         title: const Text('Driver Dashboard'),
-        // automaticallyImplyLeading removed to allow Drawer icon
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: AdminTheme.secondaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.black,
-          indicatorColor: Colors.blue,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white54,
+          indicatorColor: AdminTheme.primaryColor,
+          dividerColor: Colors.transparent,
           tabs: const [
             Tab(text: 'My Deliveries', icon: Icon(LucideIcons.bike)),
-            Tab(text: 'New Requests (Pool)', icon: Icon(LucideIcons.list)),
+            Tab(text: 'New Requests', icon: Icon(LucideIcons.list)),
           ],
         ),
       ),
-      backgroundColor: Colors.grey[100],
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -338,10 +341,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
               child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(LucideIcons.packageCheck, size: 64, color: Colors.grey),
+              Icon(LucideIcons.packageCheck, size: 64, color: Colors.white24),
               SizedBox(height: 16),
               Text('No active deliveries.',
-                  style: TextStyle(color: Colors.grey)),
+                  style: TextStyle(color: Colors.white54)),
             ],
           ));
         }
@@ -372,10 +375,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
               child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(LucideIcons.checkCircle, size: 64, color: Colors.grey),
+              Icon(LucideIcons.checkCircle, size: 64, color: Colors.white24),
               SizedBox(height: 16),
               Text('No new requests available.',
-                  style: TextStyle(color: Colors.grey)),
+                  style: TextStyle(color: Colors.white54)),
             ],
           ));
         }
@@ -396,19 +399,23 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
       {required bool isMyDelivery}) {
     final orderId = delivery['order_id'];
     final status = delivery['status'];
-    // final orderTotal = delivery['order']?['total_amount'] ?? 0.0; // If joined
-
+    // final orderTotal = delivery['order']?['total_amount'] ?? 0.0; 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 4,
+      color: AdminTheme.secondaryColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withOpacity(0.05)),
+      ),
+      elevation: 8,
+      shadowColor: Colors.black.withOpacity(0.5),
       child: FutureBuilder<Map<String, dynamic>?>(
         future: _fetchOrderDetails(orderId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Padding(
               padding: EdgeInsets.all(24.0),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CircularProgressIndicator(color: AdminTheme.primaryColor)),
             );
           }
 
@@ -448,7 +455,7 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
               : 'Unknown Pickup';
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -458,26 +465,32 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                   children: [
                     Text('Order #${orderId.toString().substring(0, 8)}',
                         style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                           color: isMyDelivery
-                              ? Colors.blue[100]
-                              : Colors.green[100],
-                          borderRadius: BorderRadius.circular(8)),
+                              ? const Color(0xFF2697FF).withOpacity(0.2)
+                              : Colors.green.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: isMyDelivery 
+                                  ? const Color(0xFF2697FF).withOpacity(0.5) 
+                                  : Colors.green.withOpacity(0.5))
+                      ),
                       child: Text(status.toUpperCase(),
                           style: TextStyle(
                               color: isMyDelivery
-                                  ? Colors.blue[800]
-                                  : Colors.green[800],
+                                  ? const Color(0xFF2697FF)
+                                  : Colors.greenAccent,
                               fontSize: 12,
                               fontWeight: FontWeight.bold)),
                     )
                   ],
                 ),
-                const Divider(),
+                const Divider(color: Colors.white12, height: 32),
 
                 // [NEW] ITEMS LIST
                 if (orderItems.isNotEmpty)
@@ -488,7 +501,7 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                         padding: const EdgeInsets.only(bottom: 8.0),
                         child: Text('${orderItems.length} Items',
                             style: TextStyle(
-                                color: Colors.grey[600], fontSize: 12)),
+                                color: Colors.white54, fontSize: 12)),
                       ),
                       ...orderItems.map((item) {
                         final productName =
@@ -501,45 +514,45 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
                               Text('${qty}x ',
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.green)),
-                              Expanded(child: Text(productName)),
+                                      color: Colors.greenAccent)),
+                              Expanded(child: Text(productName, style: const TextStyle(color: Colors.white))),
                             ],
                           ),
                         );
                       }),
-                      const Divider(),
+                      const Divider(color: Colors.white12, height: 24),
                     ],
                   ),
 
                 // Addresses
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Icon(LucideIcons.store,
-                      size: 20, color: Colors.blueGrey),
+                      size: 20, color: Colors.white54),
                   const SizedBox(width: 8),
                   Expanded(
                       child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text("Pickup",
-                          style: TextStyle(fontSize: 10, color: Colors.grey)),
-                      Text(pickupAddr, style: const TextStyle(fontSize: 14)),
+                          style: TextStyle(fontSize: 10, color: Colors.white54)),
+                      Text(pickupAddr, style: const TextStyle(fontSize: 14, color: Colors.white)),
                     ],
                   ))
                 ]),
                 const SizedBox(height: 12),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Icon(LucideIcons.mapPin,
-                      size: 20, color: Colors.orange),
+                      size: 20, color: Colors.orangeAccent),
                   const SizedBox(width: 8),
                   Expanded(
                       child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text("Drop-off",
-                          style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          style: TextStyle(fontSize: 10, color: Colors.white54)),
                       Text(dropoffAddr,
                           style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.bold)),
+                              fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                     ],
                   ))
                 ]),

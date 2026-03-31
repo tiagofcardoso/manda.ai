@@ -4,6 +4,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/app_translations.dart';
 import '../../services/auth_service.dart';
+import '../../constants/admin_theme.dart';
+import '../../utils/validators.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -31,6 +33,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   bool _isDriver = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void initState() {
@@ -116,10 +120,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+    return Theme(
+      data: AdminTheme.darkTheme,
+      child: Builder(builder: (context) {
+        final theme = Theme.of(context);
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -197,10 +203,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         decoration: InputDecoration(
                           labelText: AppTranslations.of(context, 'password'),
                           prefixIcon: const Icon(LucideIcons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
                         ),
-                        obscureText: true,
-                        validator: (v) =>
-                            (v?.length ?? 0) < 6 ? 'Min 6 chars' : null,
+                        obscureText: _obscurePassword,
+                        validator: (v) => Validators.validatePassword(v, context),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -209,8 +218,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           labelText:
                               AppTranslations.of(context, 'confirmPassword'),
                           prefixIcon: const Icon(LucideIcons.checkCircle),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscureConfirmPassword ? LucideIcons.eyeOff : LucideIcons.eye),
+                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                          ),
                         ),
-                        obscureText: true,
+                        obscureText: _obscureConfirmPassword,
                         validator: (v) {
                           if (v != _passwordController.text) {
                             return AppTranslations.of(
@@ -379,6 +392,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ),
       ),
+    );
+      }),
     );
   }
 }

@@ -15,6 +15,7 @@ import '../screens/guest_table_order_screen.dart';
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
 import '../screens/profile_screen.dart'; // NEW
+import '../screens/landing_screen.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -220,8 +221,10 @@ class _AppDrawerState extends State<AppDrawer> {
               await AuthService().signOut();
               if (mounted) {
                 // Return to Landing Screen (which is essentially a "fresh start")
-                Navigator.of(context)
-                    .pushNamedAndRemoveUntil('/', (route) => false);
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LandingScreen()),
+                  (route) => false,
+                );
               }
             },
           ),

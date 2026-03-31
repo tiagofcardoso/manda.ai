@@ -30,6 +30,7 @@ class AdminBottomLineTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
   final bool obscureText;
+  final Widget? suffixIcon;
 
   const AdminBottomLineTextField({
     super.key,
@@ -40,6 +41,7 @@ class AdminBottomLineTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.obscureText = false,
+    this.suffixIcon,
   });
 
   @override
@@ -76,6 +78,7 @@ class AdminBottomLineTextField extends StatelessWidget {
                 ),
               ),
             ),
+            if (suffixIcon != null) suffixIcon!,
           ],
         ),
         const SizedBox(height: 8),

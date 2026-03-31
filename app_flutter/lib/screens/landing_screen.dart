@@ -5,6 +5,7 @@ import 'scan_screen.dart';
 import 'admin/admin_login_screen.dart';
 import 'marketplace_screen.dart';
 import '../services/locale_service.dart';
+import '../services/auth_service.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -18,11 +19,14 @@ class LandingScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: const Color(0xFF0D0D0D),
           body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                   const SizedBox(height: 16),
                   // Language Switcher
                   Align(
@@ -136,12 +140,17 @@ class LandingScreen extends StatelessWidget {
                     delay: const Duration(milliseconds: 400),
                     child: Center(
                       child: TextButton(
-                        onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const AdminLoginScreen())),
+                        onPressed: () async {
+                          await AuthService().signOut();
+                          if (context.mounted) {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const AdminLoginScreen()));
+                          }
+                        },
                         child: Text(
-                          isPt ? 'Entrar como Colaborador' : 'Staff Login',
+                          'Login',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.3),
                             fontSize: 13,
@@ -155,9 +164,11 @@ class LandingScreen extends StatelessWidget {
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
+  },
+);
   }
 }
 

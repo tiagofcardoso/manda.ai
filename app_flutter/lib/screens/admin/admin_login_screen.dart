@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../constants/app_theme.dart';
+import '../../constants/admin_theme.dart';
 import '../../services/app_translations.dart';
 import 'admin_dashboard_screen.dart';
 import 'super_admin_dashboard_screen.dart'; // [NEW]
@@ -28,6 +29,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isCheckingSession = true;
+  bool _obscurePassword = true;
 
   final Color _brandRed = AppTheme.primaryColor;
 
@@ -145,8 +147,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F7),
+    return Theme(
+      data: AdminTheme.darkTheme,
+      child: Scaffold(
+        backgroundColor: AdminTheme.bgColor,
       body: Stack(
         children: [
           // Background Decorative Elements
@@ -186,11 +190,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         constraints: const BoxConstraints(maxWidth: 400),
                         padding: const EdgeInsets.all(40),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AdminTheme.secondaryColor,
                           borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white.withOpacity(0.05)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withOpacity(0.2),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             )
@@ -215,14 +220,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                               style: GoogleFonts.outfit(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                                color: Colors.white,
                               ),
                             ),
                             Text(
                               AppTranslations.of(context, 'adminLogin'),
                               style: GoogleFonts.inter(
                                 fontSize: 14,
-                                color: Colors.grey[600],
+                                color: Colors.white54,
                               ),
                             ),
                             const SizedBox(height: 32),
@@ -230,18 +235,26 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             // Inputs
                             TextField(
                               controller: _emailController,
-                              style: const TextStyle(color: Colors.black87),
-                              textInputAction:
-                                  TextInputAction.next, // Move to next field
+                              style: const TextStyle(color: Colors.white),
+                              textInputAction: TextInputAction.next,
                               decoration: InputDecoration(
                                 labelText: AppTranslations.of(context, 'email'),
+                                labelStyle: const TextStyle(color: Colors.white54),
                                 prefixIcon: Icon(LucideIcons.mail,
-                                    size: 20, color: Colors.grey[400]),
+                                    size: 20, color: Colors.white54),
                                 filled: true,
-                                fillColor: const Color(0xFFF9FAFB),
+                                fillColor: AdminTheme.bgColor,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: _brandRed),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     vertical: 16, horizontal: 16),
@@ -250,21 +263,40 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             const SizedBox(height: 16),
                             TextField(
                               controller: _passwordController,
-                              obscureText: true,
-                              style: const TextStyle(color: Colors.black87),
-                              textInputAction:
-                                  TextInputAction.done, // Done action
-                              onSubmitted: (_) => _signIn(), // Submit on Enter
+                              obscureText: _obscurePassword,
+                              style: const TextStyle(color: Colors.white),
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _signIn(),
                               decoration: InputDecoration(
-                                labelText:
-                                    AppTranslations.of(context, 'password'),
-                                prefixIcon: Icon(LucideIcons.lock,
-                                    size: 20, color: Colors.grey[400]),
+                                labelText: AppTranslations.of(context, 'password'),
+                                labelStyle: const TextStyle(color: Colors.white54),
+                                prefixIcon: const Icon(LucideIcons.lock,
+                                    size: 20, color: Colors.white54),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
+                                    color: Colors.white54,
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                                 filled: true,
-                                fillColor: const Color(0xFFF9FAFB),
+                                fillColor: AdminTheme.bgColor,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: _brandRed),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                     vertical: 16, horizontal: 16),
@@ -319,7 +351,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                               child: Text(
                                 AppTranslations.of(context, 'signUp'),
                                 style: TextStyle(
-                                  color: Colors.grey[600],
+                                  color: Colors.white70,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -332,6 +364,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

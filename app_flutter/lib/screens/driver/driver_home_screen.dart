@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../constants/admin_theme.dart';
 import 'driver_orders_screen.dart';
 import 'driver_earnings_screen.dart';
 import 'driver_profile_screen.dart';
@@ -22,29 +23,51 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(LucideIcons.bike),
-            label: 'Orders',
+    return Theme(
+      data: AdminTheme.darkTheme,
+      child: Scaffold(
+        backgroundColor: AdminTheme.bgColor,
+        body: _screens[_currentIndex],
+        bottomNavigationBar: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const TextStyle(color: Colors.white, fontWeight: FontWeight.bold);
+              }
+              return const TextStyle(color: Colors.white54);
+            }),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const IconThemeData(color: Colors.white);
+              }
+              return const IconThemeData(color: Colors.white54);
+            }),
           ),
-          NavigationDestination(
-            icon: Icon(LucideIcons.dollarSign),
-            label: 'Earnings',
+          child: NavigationBar(
+            backgroundColor: AdminTheme.secondaryColor,
+            indicatorColor: AdminTheme.primaryColor.withOpacity(0.3),
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(LucideIcons.bike),
+                label: 'Orders',
+              ),
+              NavigationDestination(
+                icon: Icon(LucideIcons.dollarSign),
+                label: 'Earnings',
+              ),
+              NavigationDestination(
+                icon: Icon(LucideIcons.user),
+                label: 'Profile',
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(LucideIcons.user),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }

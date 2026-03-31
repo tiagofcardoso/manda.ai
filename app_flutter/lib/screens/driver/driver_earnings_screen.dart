@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../../constants/admin_theme.dart';
 import '../../widgets/app_drawer.dart';
 
 class DriverEarningsScreen extends StatelessWidget {
@@ -13,11 +14,11 @@ class DriverEarningsScreen extends StatelessWidget {
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Earnings & Stats'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: AdminTheme.secondaryColor,
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AdminTheme.bgColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -42,7 +43,11 @@ class DriverEarningsScreen extends StatelessWidget {
 
   Widget _buildSummaryCard() {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: AdminTheme.secondaryColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withOpacity(0.05)),
+      ),
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -53,20 +58,20 @@ class DriverEarningsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Total Earnings',
-                      style: TextStyle(color: Colors.grey[600])),
+                      style: TextStyle(color: Colors.white54)),
                   const SizedBox(height: 8),
                   const Text('R\$ 1,240.50',
                       style:
-                          TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                          TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
                 ],
               ),
             ),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: Colors.green[100], shape: BoxShape.circle),
+                  color: Colors.green.withOpacity(0.2), shape: BoxShape.circle),
               child: const Icon(LucideIcons.dollarSign,
-                  color: Colors.green, size: 32),
+                  color: Colors.greenAccent, size: 32),
             )
           ],
         ),
@@ -76,7 +81,11 @@ class DriverEarningsScreen extends StatelessWidget {
 
   Widget _buildChartCard() {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: AdminTheme.secondaryColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withOpacity(0.05)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: SizedBox(
@@ -103,7 +112,7 @@ class DriverEarningsScreen extends StatelessWidget {
                       const titles = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
                       return Text(titles[value.toInt()],
                           style: const TextStyle(
-                              color: Colors.grey, fontWeight: FontWeight.bold));
+                              color: Colors.white54, fontWeight: FontWeight.bold));
                     },
                   ),
                 ),
@@ -129,7 +138,7 @@ class DriverEarningsScreen extends StatelessWidget {
       barRods: [
         BarChartRodData(
           toY: y,
-          color: Colors.blue,
+          color: AdminTheme.primaryColor,
           width: 16,
           borderRadius: BorderRadius.circular(4),
         ),
@@ -144,14 +153,16 @@ class DriverEarningsScreen extends StatelessWidget {
       itemCount: 3,
       itemBuilder: (context, index) {
         return Card(
+          color: AdminTheme.secondaryColor,
+          shape: RoundedRectangleBorder(side: BorderSide(color: Colors.white.withOpacity(0.05)), borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: const Icon(LucideIcons.checkCircle, color: Colors.green),
-            title: Text('Payout #${1000 + index}'),
-            subtitle: Text('Jan ${20 - index}, 2026'),
+            leading: const Icon(LucideIcons.checkCircle, color: Colors.greenAccent),
+            title: Text('Payout #${1000 + index}', style: const TextStyle(color: Colors.white)),
+            subtitle: Text('Jan ${20 - index}, 2026', style: const TextStyle(color: Colors.white54)),
             trailing: Text('R\$ ${350 - (index * 50)}.00',
                 style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
           ),
         );
       },

@@ -4,6 +4,7 @@ import '../../services/app_translations.dart';
 import '../../widgets/admin/admin_form_fields.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../admin/admin_dashboard_screen.dart';
+import '../../utils/validators.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -17,6 +18,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   final _supabase = Supabase.instance.client;
 
   String _t(String key) => AppTranslations.of(context, key);
@@ -117,13 +120,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     controller: _passwordController,
                     icon: LucideIcons.key,
                     placeholder: _t('newPassword'),
-                    obscureText: true,
-                    validator: (v) {
-                      if (v == null || v.length < 6) {
-                        return _t('passwordTooShort');
-                      }
-                      return null;
-                    },
+                    obscureText: _obscurePassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye, color: Colors.grey),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                    validator: (v) => Validators.validatePassword(v, context),
                   ),
                   const SizedBox(height: 16),
 
@@ -132,7 +134,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     controller: _confirmController,
                     icon: LucideIcons.check,
                     placeholder: _t('confirmPassword'),
-                    obscureText: true,
+                    obscureText: _obscureConfirmPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirmPassword ? LucideIcons.eyeOff : LucideIcons.eye, color: Colors.grey),
+                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    ),
                     validator: (v) {
                       if (v != _passwordController.text) {
                         return _t('passwordsDoNotMatch');

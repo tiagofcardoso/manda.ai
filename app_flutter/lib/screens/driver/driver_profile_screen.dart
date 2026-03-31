@@ -6,6 +6,7 @@ import '../admin/admin_login_screen.dart';
 import '../../widgets/app_drawer.dart';
 import '../../services/app_translations.dart';
 import '../../services/locale_service.dart';
+import '../../constants/admin_theme.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -131,47 +132,50 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('My Profile'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: AdminTheme.secondaryColor,
+        foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.logOut, color: Colors.red),
+            icon: const Icon(LucideIcons.logOut, color: Colors.redAccent),
             onPressed: _logout,
           )
         ],
       ),
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AdminTheme.bgColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             const CircleAvatar(
               radius: 50,
-              backgroundColor: Colors.white,
-              child: Icon(LucideIcons.user, size: 50, color: Colors.grey),
+              backgroundColor: AdminTheme.secondaryColor,
+              child: Icon(LucideIcons.user, size: 50, color: Colors.white54),
             ),
             const SizedBox(height: 16),
             Text(email,
                 style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                  color: Colors.green[100],
-                  borderRadius: BorderRadius.circular(20)),
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.green.withOpacity(0.5))),
               child: Text('Active Driver',
                   style: TextStyle(
-                      color: Colors.green[800], fontWeight: FontWeight.bold)),
+                      color: Colors.greenAccent, fontWeight: FontWeight.bold)),
             ),
 
             const SizedBox(height: 32),
 
             // Vehicle Form
             Card(
+              color: AdminTheme.secondaryColor,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.white.withOpacity(0.05))),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -179,14 +183,18 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   children: [
                     Text(AppTranslations.of(context, 'vehicleType'),
                         style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
+                            fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedVehicle,
+                      dropdownColor: AdminTheme.secondaryColor,
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: AppTranslations.of(context, 'vehicleType'),
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(LucideIcons.bike),
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.2))),
+                        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AdminTheme.primaryColor)),
+                        prefixIcon: const Icon(LucideIcons.bike, color: Colors.white54),
                       ),
                       items: vehicleOptions.map((vehicle) {
                         return DropdownMenuItem<String>(
@@ -194,9 +202,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                           child: Row(
                             children: [
                               Icon(vehicle['icon'] as IconData,
-                                  size: 20, color: Colors.blueGrey),
+                                  size: 20, color: Colors.white54),
                               const SizedBox(width: 12),
-                              Text(vehicle['label'] as String),
+                              Text(vehicle['label'] as String, style: const TextStyle(color: Colors.white)),
                             ],
                           ),
                         );
@@ -212,10 +220,13 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     const SizedBox(height: 24),
                     TextField(
                       controller: _plateController,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
                         labelText: 'License Plate',
-                        prefixIcon: Icon(LucideIcons.hash),
-                        border: OutlineInputBorder(),
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        prefixIcon: const Icon(LucideIcons.hash, color: Colors.white54),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.2))),
+                        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AdminTheme.primaryColor)),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -243,22 +254,27 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
             // App Settings
             Card(
+              color: AdminTheme.secondaryColor,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.white.withOpacity(0.05))),
               child: ListTile(
-                leading: const Icon(LucideIcons.globe, color: Colors.blue),
-                title: const Text('Language / Idioma'),
+                leading: const Icon(LucideIcons.globe, color: AdminTheme.primaryColor),
+                title: const Text('Language / Idioma', style: TextStyle(color: Colors.white)),
                 subtitle: Text(
                     Localizations.localeOf(context).languageCode == 'en'
                         ? 'English'
-                        : 'Português'),
+                        : 'Português',
+                    style: const TextStyle(color: Colors.white54)),
                 trailing: Switch(
                   value: Localizations.localeOf(context).languageCode == 'pt',
                   onChanged: (isPt) {
                     LocaleService().setLocale(
                         isPt ? const Locale('pt') : const Locale('en'));
                   },
-                  activeThumbColor: Colors.green,
+                  activeThumbColor: Colors.greenAccent,
+                  activeColor: Colors.green.withOpacity(0.5),
+                  inactiveThumbColor: Colors.white54,
                 ),
               ),
             ),

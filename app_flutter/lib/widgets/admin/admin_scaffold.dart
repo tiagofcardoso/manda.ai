@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../constants/admin_theme.dart';
 import '../../utils/responsive.dart';
 import '../../screens/admin/admin_dashboard_screen.dart';
 import '../../screens/admin/admin_orders_screen.dart';
@@ -31,83 +32,144 @@ class AdminScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use Responsive helper. Treat Tablet as Mobile (Drawer) for simplicity, or modify Responsive to include specific Sidebar breakpoint.
-    // For now, let's align with the Desktop breakpoint (1200) for standard layout,
-    // OR we can allow Tablets (>= 600) to have sidebar if we rotate?
-    // The previous code used 900. Let's use Responsive.width(context) > 900 for now to minimize regression,
-    // but using the helper class accessing width.
-    final bool isDesktop =
-        Responsive.isDesktop(context) || Responsive.width(context) > 900;
+    final bool isDesktop = Responsive.isDesktop(context);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F7), // Soft background for admin
-      appBar: !isDesktop
-          ? AppBar(
-              title: Text(title,
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black87,
-              elevation: 0,
-              iconTheme: const IconThemeData(color: Colors.black87),
-              actions: actions,
-            )
-          : null, // No AppBar on desktop, we use the sidebar headers
-      drawer: !isDesktop
-          ? _AdminSidebar(isMobile: true, activeRoute: activeRoute)
-          : null,
-      body: Row(
+    // Force Dark Theme for Admin Components
+    return Theme(
+      data: AdminTheme.darkTheme,
+      child: Scaffold(
+        backgroundColor: AdminTheme.bgColor,
+        appBar: !isDesktop
+            ? AppBar(
+                title: Text(title,
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+                backgroundColor: AdminTheme.bgColor,
+                elevation: 0,
+                iconTheme: const IconThemeData(color: Colors.white),
+                actions: actions,
+              )
+            : null,
+        drawer: !isDesktop
+            ? _AdminSidebar(isMobile: true, activeRoute: activeRoute)
+            : null,
+        body: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isDesktop && showSidebar)
+                Expanded(
+                  flex: 2, // 2/12 = ~16% width
+                  child: _AdminSidebar(isMobile: false, activeRoute: activeRoute),
+                ),
+              Expanded(
+                flex: 10,
+                child: Column(
+                  children: [
+                    if (isDesktop)
+                      _Header(title: title, actions: actions),
+                    Expanded(child: body),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: floatingActionButton,
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  final String title;
+  final List<Widget>? actions;
+
+  const _Header({required this.title, this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 80,
+      padding: const EdgeInsets.symmetric(horizontal: AdminTheme.defaultPadding),
+      color: AdminTheme.bgColor,
+      child: Row(
         children: [
-          // Desktop Sidebar
-          if (isDesktop && showSidebar)
-            SizedBox(
-              width: 250,
-              child: _AdminSidebar(isMobile: false, activeRoute: activeRoute),
-            ),
-
-          // Main Content
-          Expanded(
-            child: Column(
-              children: [
-                if (isDesktop)
-                  Container(
-                    height: 80,
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    color: Colors.white,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(title,
-                            style: GoogleFonts.outfit(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87)),
-                        Row(
-                          children: [
-                            if (actions != null) ...actions!,
-                            const SizedBox(width: 16),
-                            IconButton(
-                                onPressed: () {},
-                                icon: const Icon(LucideIcons.bell,
-                                    color: Colors.grey)),
-                            const SizedBox(width: 16),
-                            const CircleAvatar(
-                              backgroundColor: Colors.red,
-                              child: Text("A",
-                                  style: TextStyle(color: Colors.white)),
-                            )
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                Expanded(child: body),
-              ],
+          Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
+          const Spacer(flex: 2),
+          // Search Field Placeholder
+          Expanded(
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: "Pesquisar...",
+                hintStyle: TextStyle(color: Colors.white54),
+                fillColor: AdminTheme.secondaryColor,
+                filled: true,
+                border: const OutlineInputBorder(
+                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+                suffixIcon: InkWell(
+                  onTap: () {},
+                  child: Container(
+                    padding: const EdgeInsets.all(AdminTheme.defaultPadding * 0.75),
+                    margin: const EdgeInsets.symmetric(horizontal: AdminTheme.defaultPadding / 2),
+                    decoration: const BoxDecoration(
+                      color: AdminTheme.primaryColor,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
+                    child: const Icon(LucideIcons.search, size: 18, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AdminTheme.defaultPadding),
+          if (actions != null) ...actions!,
+          const _ProfileCard(),
         ],
       ),
-      floatingActionButton: floatingActionButton,
+    );
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(left: AdminTheme.defaultPadding),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AdminTheme.defaultPadding,
+        vertical: AdminTheme.defaultPadding / 2,
+      ),
+      decoration: BoxDecoration(
+        color: AdminTheme.secondaryColor,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            backgroundColor: AdminTheme.primaryColor,
+            radius: 16,
+            child: Icon(LucideIcons.user, size: 16, color: Colors.white),
+          ),
+          if (!Responsive.isMobile(context))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AdminTheme.defaultPadding / 2),
+              child: Text("Admin", style: GoogleFonts.inter(color: Colors.white)),
+            ),
+          const Icon(LucideIcons.chevronDown, size: 16, color: Colors.white54),
+        ],
+      ),
     );
   }
 }
@@ -161,80 +223,73 @@ class _AdminSidebarState extends State<_AdminSidebar> {
   }
 
   bool get _showKDS {
-    // Show KDS only for restaurant/food/drinks types
     const kitchenTypes = {'restaurant', 'food', 'drinks', 'bar', 'cafe', 'bakery'};
     return _establishmentType == null || kitchenTypes.contains(_establishmentType);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white, // White sidebar
+    return Drawer(
+      backgroundColor: AdminTheme.bgColor,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero), // Flat edge
       child: SafeArea(
         child: Column(
           children: [
             // Logo Area
             Container(
-              height: widget.isMobile ? 150 : 80,
-              alignment: widget.isMobile ? Alignment.center : Alignment.centerLeft,
-              padding: const EdgeInsets.all(24),
+              height: 80,
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
-                mainAxisAlignment: widget.isMobile
-                    ? MainAxisAlignment.center
-                    : MainAxisAlignment.start,
                 children: [
                   Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFEA1D2C),
-                          borderRadius: BorderRadius.circular(8)),
-                      child: const Icon(LucideIcons.zap,
-                          color: Colors.white, size: 20)),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AdminTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(LucideIcons.zap, color: Colors.white, size: 20),
+                  ),
                   const SizedBox(width: 12),
-                  Text("Manda.AI",
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w800, fontSize: 22)),
+                  Text(
+                    "Manda.AI",
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),
-
-            if (widget.isMobile) const Divider(),
-
+            const Divider(color: Colors.white10, height: 1),
             // Menu Items
             Expanded(
               child: ListView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  _buildMenuItem(
-                      context,
-                      'Dashboard',
-                      LucideIcons.layoutDashboard,
-                      '/admin-dashboard',
-                      widget.activeRoute == '/admin-dashboard'),
-                  _buildMenuItem(context, 'Pedidos', LucideIcons.shoppingBag,
-                      '/admin-orders', widget.activeRoute == '/admin-orders'),
-                  _buildMenuItem(context, 'Produtos', LucideIcons.utensils,
-                      '/admin-products', widget.activeRoute == '/admin-products'),
-                  _buildMenuItem(context, 'Vendas', LucideIcons.barChart2,
-                      '/admin-sales', widget.activeRoute == '/admin-sales'),
-                  const Divider(height: 32),
-                  // KDS only for restaurant/drinks type establishments
+                  _buildMenuItem(context, 'Dashboard', LucideIcons.layoutDashboard, '/admin-dashboard', widget.activeRoute == '/admin-dashboard'),
+                  _buildMenuItem(context, 'Pedidos', LucideIcons.shoppingBag, '/admin-orders', widget.activeRoute == '/admin-orders'),
+                  _buildMenuItem(context, 'Produtos', LucideIcons.box, '/admin-products', widget.activeRoute == '/admin-products'),
+                  _buildMenuItem(context, 'Vendas', LucideIcons.barChart2, '/admin-sales', widget.activeRoute == '/admin-sales'),
+                  
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Divider(color: Colors.white10),
+                  ),
+                  
                   if (_showKDS)
-                    _buildMenuItem(context, 'Cozinha (KDS)', LucideIcons.monitor,
-                        '/kitchen', widget.activeRoute == '/kitchen'),
-                  _buildMenuItem(context, 'Configurações', LucideIcons.settings,
-                      '/settings', widget.activeRoute == '/settings'),
+                    _buildMenuItem(context, 'Cozinha (KDS)', LucideIcons.monitor, '/kitchen', widget.activeRoute == '/kitchen'),
+                  _buildMenuItem(context, 'Configurações', LucideIcons.settings, '/settings', widget.activeRoute == '/settings'),
                 ],
               ),
             ),
-
             // Logout
+            const Divider(color: Colors.white10, height: 1),
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: _buildMenuItem(
-                  context, 'Sair', LucideIcons.logOut, '/logout', false,
-                  isLogout: true),
+              padding: const EdgeInsets.all(8.0),
+              child: _buildMenuItem(context, 'Sair', LucideIcons.logOut, '/logout', false, isLogout: true),
             ),
           ],
         ),
@@ -242,70 +297,72 @@ class _AdminSidebarState extends State<_AdminSidebar> {
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, String title, IconData icon,
-      String route, bool isActive,
-      {bool isLogout = false}) {
-    return ListTile(
-      leading: Icon(icon,
-          color: isLogout
-              ? Colors.red
-              : (isActive ? const Color(0xFFEA1D2C) : Colors.grey[600])),
-      title: Text(title,
+  Widget _buildMenuItem(BuildContext context, String title, IconData icon, String route, bool isActive, {bool isLogout = false}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isActive ? AdminTheme.primaryColor.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        leading: Icon(
+          icon,
+          color: isLogout 
+            ? Colors.redAccent 
+            : isActive ? AdminTheme.primaryColor : Colors.white54,
+          size: 20,
+        ),
+        title: Text(
+          title,
           style: GoogleFonts.inter(
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-              color: isLogout
-                  ? Colors.red
-                  : (isActive ? const Color(0xFFEA1D2C) : Colors.black87))),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      tileColor: isActive
-          ? const Color(0xFFEA1D2C).withOpacity(0.08)
-          : Colors.transparent,
-      onTap: () async {
-        if (isActive) {
-          if (widget.isMobile) {
-            Navigator.pop(context); // Close drawer if already on page
+            color: isLogout 
+              ? Colors.redAccent 
+              : isActive ? Colors.white : Colors.white54,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+        onTap: () async {
+          if (isActive) {
+            if (widget.isMobile) Navigator.pop(context);
+            return;
           }
-          return;
-        }
 
-        if (isLogout) {
-          await Supabase.instance.client.auth.signOut();
-          if (context.mounted) {
-            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+          if (isLogout) {
+            await Supabase.instance.client.auth.signOut();
+            if (context.mounted) {
+              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            }
+            return;
           }
-          return;
-        }
 
-        Widget? page;
-        switch (route) {
-          case '/admin-dashboard':
-            page = const AdminDashboardScreen();
-            break;
-          case '/admin-orders':
-            page =
-                const AdminOrdersScreen(); // Needs AdminScaffold wrapper update
-            break;
-          case '/admin-products':
-            page =
-                const AdminProductsScreen(); // Needs AdminScaffold wrapper update
-            break;
-          case '/admin-sales':
-            page =
-                const AdminSalesScreen(); // Needs AdminScaffold wrapper update check
-            break;
-          case '/kitchen':
-            page = const KitchenScreen();
-            break;
-          case '/settings':
-            page = const AdminSettingsScreen();
-            break;
-        }
+          Widget? page;
+          switch (route) {
+            case '/admin-dashboard':
+              page = const AdminDashboardScreen();
+              break;
+            case '/admin-orders':
+              page = const AdminOrdersScreen();
+              break;
+            case '/admin-products':
+              page = const AdminProductsScreen();
+              break;
+            case '/admin-sales':
+              page = const AdminSalesScreen();
+              break;
+            case '/kitchen':
+              page = const KitchenScreen();
+              break;
+            case '/settings':
+              page = const AdminSettingsScreen();
+              break;
+          }
 
-        if (page != null) {
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => page!));
-        }
-      },
+          if (page != null) {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page!));
+          }
+        },
+      ),
     );
   }
 }
