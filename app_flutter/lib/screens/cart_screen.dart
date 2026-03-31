@@ -8,6 +8,7 @@ import '../services/order_service.dart';
 import '../models/cart_item.dart';
 import '../services/app_translations.dart';
 import '../services/auth_service.dart';
+import '../services/settings_service.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -101,7 +102,7 @@ class CartScreen extends StatelessWidget {
                                         fontSize: 16)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  NumberFormat.currency(symbol: '€')
+                                  NumberFormat.currency(symbol: SettingsService().getCurrencySymbol(SettingsService().currency))
                                       .format(item.total),
                                   style: const TextStyle(
                                       color: Color(0xFFE63946),
@@ -289,7 +290,11 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
 
   void _handleSuccess(String orderId) {
     OrderService().setOrderId(orderId);
-    widget.cartService.clear();
+    if (widget.cartService.tableId != null) {
+       widget.cartService.clearCartItemsOnly(); // Keep table context alive
+    } else {
+       widget.cartService.clear();
+    }
 
     if (mounted) {
       Navigator.pop(context); // Close Cart
@@ -377,7 +382,7 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold)),
                 Text(
-                  NumberFormat.currency(symbol: '€')
+                  NumberFormat.currency(symbol: SettingsService().getCurrencySymbol(SettingsService().currency))
                       .format(widget.cartService.totalAmount),
                   style: const TextStyle(
                       fontSize: 20,

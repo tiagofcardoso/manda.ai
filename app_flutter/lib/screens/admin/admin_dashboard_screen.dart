@@ -8,12 +8,12 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../services/settings_service.dart';
 import '../../services/app_translations.dart';
 import '../../constants/api.dart';
 import '../../constants/admin_theme.dart';
 import '../../widgets/admin/admin_scaffold.dart';
 import '../../utils/responsive.dart';
-import 'admin_tables_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -23,12 +23,20 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  // Stats map initialized with defaults
   Map<String, dynamic> _stats = {
     "total_revenue": 0.0,
     "total_orders": 0,
     "delivery_count": 0,
-    "kitchen_count": 0
+    "kitchen_count": 0,
   };
+
+  // Advanced counters for the pie chart
+  int _dineInCount = 0;
+  int _takeawayCount = 0;
+  int _cancelledCount = 0;
+  int _dailyDeliveryCount = 0;
+
   List<dynamic> _recentOrders = [];
   bool _isLoading = true;
   Timer? _refreshTimer;
@@ -41,11 +49,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void initState() {
     super.initState();
     _checkSuperAdminContext();
+    SettingsService().loadCurrency(); // Ensure currency is always fresh for admin
     _fetchStats();
+    _fetchOrderDistribution(); // Load real data for the PieChart
     _fetchRecentOrders();
+
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
         _fetchStats(silent: true);
+        _fetchOrderDistribution();
         _fetchRecentOrders();
       }
     });
@@ -55,6 +67,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _fetchOrderDistribution() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
+
+      // Ensure we query for the current establishment
+      final profile = await supabase.from('profiles').select('establishment_id').eq('id', supabase.auth.currentUser!.id).single();
+      final estId = profile['establishment_id'];
+      if (estId == null) return;
+
+      final response = await supabase
+          .from('orders')
+          .select('order_type, status, table_id')
+          .eq('establishment_id', estId)
+          .gte('created_at', startOfDay);
+
+      int dineIn = 0;
+      int delivery = 0;
+      int takeaway = 0;
+      int cancelled = 0;
+
+      for (var order in response) {
+        if (order['status'] == 'cancelled') {
+          cancelled++;
+          continue;
+        }
+
+        if (order['table_id'] != null || order['order_type'] == 'dine_in') {
+          dineIn++;
+        } else if (order['order_type'] == 'delivery') {
+          delivery++;
+        } else {
+          takeaway++; // Assume default fallback is takeaway if no table
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _dineInCount = dineIn;
+          _dailyDeliveryCount = delivery;
+          _takeawayCount = takeaway;
+          _cancelledCount = cancelled;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching order distribution: $e");
+    }
   }
 
   Future<void> _fetchStats({bool silent = false}) async {
@@ -88,11 +150,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final supabase = Supabase.instance.client;
       // Fetch the 5 most recent orders for the UI
+      final profile = await supabase.from('profiles').select('establishment_id').eq('id', supabase.auth.currentUser!.id).single();
+      final estId = profile['establishment_id'];
+
+      if(estId == null) return;
+
       final response = await supabase
           .from('orders')
-          .select('id, total_price, status, created_at, order_type')
+          .select('id, total_price, status, created_at, order_type, table_id')
+          .eq('establishment_id', estId)
           .order('created_at', ascending: false)
-          .limit(5);
+          .limit(8); // Grab up to 8 for the new beautiful list
 
       if (mounted) {
         setState(() => _recentOrders = response);
@@ -144,7 +212,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       activeRoute: '/admin-dashboard',
       actions: _isSuperAdmin
           ? [
-              // Badge & Exit logic skipped for brevity, keeping simple for this design
               IconButton(onPressed: _exitAdminMode, icon: const Icon(LucideIcons.logOut, color: Colors.redAccent))
             ]
           : null,
@@ -161,21 +228,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: Column(
                       children: [
                         _buildStatCardsRow(context),
-                        const SizedBox(height: AdminTheme.defaultPadding),
-                        _buildRecentOrders(),
+                        const SizedBox(height: AdminTheme.defaultPadding * 1.5),
+                        _buildRecentOrdersCards(),
                         if (Responsive.isMobile(context))
-                          const SizedBox(height: AdminTheme.defaultPadding),
+                          const SizedBox(height: AdminTheme.defaultPadding * 1.5),
                         if (Responsive.isMobile(context))
-                          const _OrderDetailsChart(),
+                          _buildOrderDetailsChart(),
                       ],
                     ),
                   ),
                   if (!Responsive.isMobile(context))
-                    const SizedBox(width: AdminTheme.defaultPadding),
+                    const SizedBox(width: AdminTheme.defaultPadding * 1.5),
                   if (!Responsive.isMobile(context))
-                    const Expanded(
+                    Expanded(
                       flex: 2,
-                      child: _OrderDetailsChart(),
+                      child: _buildOrderDetailsChart(),
                     ),
                 ],
               ),
@@ -187,29 +254,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildStatCardsRow(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: Responsive.isMobile(context) ? 2 : 4,
-      crossAxisSpacing: AdminTheme.defaultPadding,
-      mainAxisSpacing: AdminTheme.defaultPadding,
-      childAspectRatio: 1.2,
-      children: [
-        _buildStatCard("Vendas (Hoje)", _isLoading ? "..." : currencyFormat.format(_stats['total_revenue']), LucideIcons.dollarSign, Colors.green),
-        _buildStatCard("Pedidos", _isLoading ? "..." : "${_stats['total_orders']}", LucideIcons.shoppingBag, Colors.blue),
-        _buildStatCard("Entregas", _isLoading ? "..." : "${_stats['delivery_count'] ?? 0}", LucideIcons.bike, Colors.orange),
-        _buildStatCard("Cozinha", _isLoading ? "..." : "${_stats['kitchen_count'] ?? 0}", LucideIcons.chefHat, Colors.redAccent),
-      ],
+    return ValueListenableBuilder<String>(
+      valueListenable: SettingsService().currencyNotifier,
+      builder: (context, currency, _) {
+        final currencySymbol = SettingsService().getCurrencySymbol(currency);
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: Responsive.isMobile(context) ? 2 : 4,
+          crossAxisSpacing: AdminTheme.defaultPadding,
+          mainAxisSpacing: AdminTheme.defaultPadding,
+          childAspectRatio: 1.2,
+          children: [
+            _buildAnimatedStatCard(
+               "Vendas (Hoje)", 
+               _stats['total_revenue']?.toDouble() ?? 0.0, 
+               isCurrency: true, 
+               currencySymbol: currencySymbol,
+               icon: LucideIcons.dollarSign, 
+               cardGlowColor: const Color(0xFF11998e)
+            ),
+            _buildAnimatedStatCard(
+               "Pedidos", 
+               (_stats['total_orders'] ?? 0).toDouble(), 
+               icon: LucideIcons.layers, 
+               cardGlowColor: const Color(0xFF3b82f6)
+            ),
+            _buildAnimatedStatCard(
+               "Entregas", 
+               (_stats['delivery_count'] ?? 0).toDouble(), 
+               icon: LucideIcons.bike, 
+               cardGlowColor: const Color(0xFFf59e0b)
+            ),
+            _buildAnimatedStatCard(
+               "Cozinha Ativa", 
+               (_stats['kitchen_count'] ?? 0).toDouble(), 
+               icon: LucideIcons.flame, 
+               cardGlowColor: const Color(0xFFef4444)
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+
+  Widget _buildAnimatedStatCard(String title, double targetValue, {bool isCurrency = false, String currencySymbol = "", required IconData icon, required Color cardGlowColor}) {
     return Container(
       padding: const EdgeInsets.all(AdminTheme.defaultPadding),
       decoration: BoxDecoration(
-        color: AdminTheme.secondaryColor,
-        borderRadius: BorderRadius.circular(10),
+        color: const Color(0xFF1E1E2D), // Dark premium card
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cardGlowColor.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: cardGlowColor.withOpacity(0.15),
+            blurRadius: 15,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,161 +323,257 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(AdminTheme.defaultPadding * 0.75),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, color: color, size: 20),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                     colors: [cardGlowColor.withOpacity(0.3), cardGlowColor.withOpacity(0.1)],
+                     begin: Alignment.topLeft,
+                     end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10)
+                ),
+                child: Icon(icon, color: cardGlowColor, size: 22),
               ),
-              const Icon(LucideIcons.moreVertical, color: Colors.white54, size: 16)
+              Icon(LucideIcons.moreHorizontal, color: Colors.white.withOpacity(0.3), size: 18)
             ],
           ),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(value, style: GoogleFonts.inter(fontSize: Responsive.isMobile(context)? 20 : 24, fontWeight: FontWeight.bold, color: Colors.white)),
+          
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: targetValue),
+            duration: const Duration(milliseconds: 1500),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              String displayValue = isCurrency 
+                  ? NumberFormat.currency(symbol: currencySymbol).format(value)
+                  : value.toInt().toString();
+
+              if (_isLoading) displayValue = "...";
+
+              return FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  displayValue, 
+                  style: GoogleFonts.outfit(
+                     fontSize: Responsive.isMobile(context)? 24 : 28, 
+                     fontWeight: FontWeight.bold, 
+                     color: Colors.white,
+                     letterSpacing: 1.0,
+                  )
+                ),
+              );
+            },
           ),
-          Text(title, style: GoogleFonts.inter(fontSize: 14, color: Colors.white54)),
+          Text(title, style: GoogleFonts.inter(fontSize: 13, color: Colors.white54, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 
-  Widget _buildRecentOrders() {
+  Widget _buildRecentOrdersCards() {
     return Container(
-      padding: const EdgeInsets.all(AdminTheme.defaultPadding),
       decoration: BoxDecoration(
-        color: AdminTheme.secondaryColor,
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.transparent, // Background transparent because cards contain the bulk
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Pedidos Recentes", style: GoogleFonts.inter(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Atividade Recente", style: GoogleFonts.outfit(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+              TextButton(
+                  onPressed: () => Navigator.pushReplacementNamed(context, '/admin-orders'),
+                  child: Text("Ver Tudo", style: GoogleFonts.inter(color: Colors.blueAccent)))
+            ],
+          ),
           const SizedBox(height: AdminTheme.defaultPadding),
-          SizedBox(
-            width: double.infinity,
-            child: DataTable(
-              columnSpacing: AdminTheme.defaultPadding,
-              horizontalMargin: 0,
-              headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.transparent),
-              columns: const [
-                DataColumn(label: Text("ID", style: TextStyle(color: Colors.white54))),
-                DataColumn(label: Text("Data", style: TextStyle(color: Colors.white54))),
-                DataColumn(label: Text("Tipo", style: TextStyle(color: Colors.white54))),
-                DataColumn(label: Text("Status", style: TextStyle(color: Colors.white54))),
-                DataColumn(label: Text("Valor", style: TextStyle(color: Colors.white54))),
-              ],
-              rows: _recentOrders.map((order) {
+          if (_isLoading) 
+             const Center(child: CircularProgressIndicator())
+          else if (_recentOrders.isEmpty)
+             const Text("Nenhum pedido recente.", style: TextStyle(color: Colors.white54))
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _recentOrders.length,
+              itemBuilder: (context, index) {
+                final order = _recentOrders[index];
                 final date = DateTime.parse(order['created_at']).toLocal();
-                final formattedDate = DateFormat('HH:mm').format(date);
-                final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-
-                return DataRow(
-                  cells: [
-                    DataCell(Text(order['id'].toString().substring(0, 6) + '...', style: const TextStyle(color: Colors.white))),
-                    DataCell(Text(formattedDate, style: const TextStyle(color: Colors.white))),
-                    DataCell(Text(order['order_type'] ?? 'Delivery', style: const TextStyle(color: Colors.white))),
-                    DataCell(
+                final formattedDate = DateFormat('dd/MMM HH:mm').format(date);
+                final curFormat = NumberFormat.currency(symbol: SettingsService().getCurrencySymbol(SettingsService().currency));
+                
+                final isTable = order['table_id'] != null;
+                final typeText = isTable ? "Salão" : (order['order_type'] == 'delivery' ? "Delivery" : "Retirada");
+                final typeIcon = isTable ? LucideIcons.armchair : (order['order_type'] == 'delivery' ? LucideIcons.bike : LucideIcons.shoppingBag);
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.03), // Glassmorphism base
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: Row(
+                    children: [
+                      // Status Indicator Line
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        width: 4,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: _getStatusColor(order['status']).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          order['status'] ?? 'unknown',
-                          style: TextStyle(color: _getStatusColor(order['status']), fontSize: 12),
+                          color: _getStatusColor(order['status']),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                    ),
-                    DataCell(Text(currencyFormat.format(order['total_price']), style: const TextStyle(color: Colors.white))),
-                  ],
+                      const SizedBox(width: 16),
+                      // Icon Badge
+                      Container(
+                         padding: const EdgeInsets.all(10),
+                         decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                         ),
+                         child: Icon(typeIcon, color: Colors.white70, size: 18),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                             Text('Pedido #${order['id'].toString().substring(0, 6)}', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
+                             const SizedBox(height: 4),
+                             Text("$typeText • $formattedDate", style: GoogleFonts.inter(color: Colors.white54, fontSize: 12)),
+                           ],
+                        ),
+                      ),
+                      
+                      // Status Chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                           color: _getStatusColor(order['status']).withOpacity(0.15),
+                           borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _formatStatus(order['status']),
+                          style: GoogleFonts.inter(color: _getStatusColor(order['status']), fontSize: 11, fontWeight: FontWeight.bold)
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      
+                      // Price
+                      Text(curFormat.format(order['total_price']), style: GoogleFonts.outfit(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
                 );
-              }).toList(),
+              },
             ),
-          ),
         ],
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    if (status == 'delivered') return Colors.green;
-    if (status == 'preparing') return Colors.blue;
-    if (status == 'out_for_delivery') return Colors.orange;
-    return Colors.redAccent;
+  String _formatStatus(String? status) {
+     if (status == 'pending') return 'Pendente';
+     if (status == 'prep') return 'Preparando';
+     if (status == 'ready') return 'Pronto';
+     if (status == 'out_for_delivery') return 'A Caminho';
+     if (status == 'delivered') return 'Entregue';
+     if (status == 'completed') return 'Finalizado';
+     if (status == 'cancelled') return 'Cancelado';
+     return status ?? 'Desconhecido';
   }
-}
 
-class _OrderDetailsChart extends StatelessWidget {
-  const _OrderDetailsChart();
+  Color _getStatusColor(String? status) {
+    if (status == 'completed' || status == 'delivered') return const Color(0xFF10b981); // Emerald
+    if (status == 'ready') return const Color(0xFF34d399); // Light Green
+    if (status == 'prep' || status == 'preparing') return const Color(0xFF3b82f6); // Blue
+    if (status == 'out_for_delivery' || status == 'on_way') return const Color(0xFFf59e0b); // Orange
+    if (status == 'cancelled') return const Color(0xFFef4444); // Red
+    return const Color(0xFF8b5cf6); // Purple for pending or unknown
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildOrderDetailsChart() {
+    final int totalDynamicOrders = _dineInCount + _dailyDeliveryCount + _takeawayCount + _cancelledCount;
+
     return Container(
-      padding: const EdgeInsets.all(AdminTheme.defaultPadding),
+      padding: const EdgeInsets.all(AdminTheme.defaultPadding * 1.5),
       decoration: BoxDecoration(
-        color: AdminTheme.secondaryColor,
-        borderRadius: BorderRadius.circular(10),
+        color: const Color(0xFF1E1E2D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Visão Geral", style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
-          const SizedBox(height: AdminTheme.defaultPadding),
+          Text("Distribuição Hoje", style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: AdminTheme.defaultPadding * 2),
           SizedBox(
-            height: 200,
+            height: 220,
             child: Stack(
               children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 0,
-                    centerSpaceRadius: 70,
-                    startDegreeOffset: -90,
-                    sections: [
-                      PieChartSectionData(color: AdminTheme.primaryColor, value: 25, showTitle: false, radius: 25),
-                      PieChartSectionData(color: const Color(0xFF26E5FF), value: 20, showTitle: false, radius: 22),
-                      PieChartSectionData(color: const Color(0xFFFFCF26), value: 10, showTitle: false, radius: 19),
-                      PieChartSectionData(color: const Color(0xFFEE2727), value: 15, showTitle: false, radius: 16),
-                      PieChartSectionData(color: AdminTheme.primaryColor.withOpacity(0.1), value: 25, showTitle: false, radius: 13),
-                    ],
-                  ),
-                ),
+                if (totalDynamicOrders > 0)
+                  PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 65,
+                      startDegreeOffset: -90,
+                      sections: [
+                        if (_dailyDeliveryCount > 0) PieChartSectionData(color: const Color(0xFF26E5FF), value: _dailyDeliveryCount.toDouble(), showTitle: false, radius: 25),
+                        if (_dineInCount > 0) PieChartSectionData(color: const Color(0xFF3b82f6), value: _dineInCount.toDouble(), showTitle: false, radius: 22),
+                        if (_takeawayCount > 0) PieChartSectionData(color: const Color(0xFFFFCF26), value: _takeawayCount.toDouble(), showTitle: false, radius: 19),
+                        if (_cancelledCount > 0) PieChartSectionData(color: const Color(0xFFEE2727), value: _cancelledCount.toDouble(), showTitle: false, radius: 16),
+                      ],
+                    ),
+                  )
+                else
+                  Center(child: Text("Sem Dados Hoje", style: GoogleFonts.inter(color: Colors.white54))),
+                
                 Positioned.fill(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: AdminTheme.defaultPadding),
-                      Text("29.1", style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w600, height: 0.5)),
-                      const Text("Pedidos de Hoje", style: TextStyle(color: Colors.white54))
+                      TweenAnimationBuilder<double>(
+                         tween: Tween<double>(begin: 0, end: totalDynamicOrders.toDouble()),
+                         duration: const Duration(milliseconds: 1500),
+                         builder: (context, val, child) {
+                            return Text(
+                               val.toInt().toString(), 
+                               style: GoogleFonts.outfit(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold, height: 1.0)
+                            );
+                         }
+                      ),
+                      Text("Pedidos", style: GoogleFonts.inter(color: Colors.white54, fontSize: 13))
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AdminTheme.defaultPadding),
-          _buildLegend(" Delivery", const Color(0xFF26E5FF), "12 Pedidos"),
-          _buildLegend(" Restaurante", AdminTheme.primaryColor, "8 Pedidos"),
-          _buildLegend(" Retirada", const Color(0xFFFFCF26), "5 Pedidos"),
-          _buildLegend(" Cancelados", const Color(0xFFEE2727), "3 Pedidos"),
+          const SizedBox(height: AdminTheme.defaultPadding * 2),
+          _buildGraphLegend(" Delivery", const Color(0xFF26E5FF), "$_dailyDeliveryCount"),
+          _buildGraphLegend(" Salão / Mesa", const Color(0xFF3b82f6), "$_dineInCount"),
+          _buildGraphLegend(" Retirada", const Color(0xFFFFCF26), "$_takeawayCount"),
+          _buildGraphLegend(" Cancelados", const Color(0xFFEE2727), "$_cancelledCount"),
         ],
       ),
     );
   }
 
-  Widget _buildLegend(String title, Color color, String amount) {
+  Widget _buildGraphLegend(String title, Color color, String amount) {
     return Container(
-      margin: const EdgeInsets.only(top: AdminTheme.defaultPadding),
-      padding: const EdgeInsets.all(AdminTheme.defaultPadding / 2),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(width: 2, color: AdminTheme.primaryColor.withOpacity(0.15)),
+        color: Colors.white.withOpacity(0.02),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          Container(width: 14, height: 14, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: AdminTheme.defaultPadding),
-          Expanded(child: Text(title, style: const TextStyle(color: Colors.white))),
-          Text(amount, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+          Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 4)])),
+          const SizedBox(width: 12),
+          Expanded(child: Text(title, style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w500))),
+          Text(amount, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );

@@ -122,4 +122,85 @@ class PrinterService {
       name: 'Pedido_$orderId',
     );
   }
+
+  Future<void> printTableBill(List<Map<String, dynamic>> orders, String tableNumber, String establishmentName, double subtotal) async {
+    final doc = pw.Document();
+    final currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+
+    doc.addPage(pw.Page(
+      pageFormat: PdfPageFormat.roll80,
+      margin: const pw.EdgeInsets.all(10),
+      build: (pw.Context context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            pw.Center(
+              child: pw.Text(establishmentName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Center(
+              child: pw.Text('CONTA DA MESA $tableNumber', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            ),
+            pw.Text('Fechamento: ${dateFormat.format(DateTime.now())}'),
+            pw.SizedBox(height: 10),
+            pw.Divider(),
+            ...orders.expand((order) {
+              final List<dynamic> items = order['order_items'] ?? order['cart_items'] ?? [];
+              final orderId = (order['id'] ?? '').toString();
+              return [
+                pw.Text('Pedido #${orderId.substring(0, orderId.length > 6 ? 6 : orderId.length)}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                ...items.map((item) {
+                  final num qty = item['quantity'] ?? 1;
+                  final String name = item['products']?['name'] ?? item['name'] ?? 'Item';
+                  final double price = double.tryParse((item['products']?['price'] ?? item['price_at_time'] ?? item['price'] ?? 0).toString()) ?? 0.0;
+                  return pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 4),
+                    child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Expanded(child: pw.Text('${qty}x $name', style: const pw.TextStyle(fontSize: 12))),
+                        pw.Text(currencyFormat.format(price * qty), style: const pw.TextStyle(fontSize: 12)),
+                      ]
+                    )
+                  );
+                }),
+                pw.SizedBox(height: 4),
+              ];
+            }).toList(),
+            pw.Divider(),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('SUBTOTAL', style: const pw.TextStyle(fontSize: 14)),
+                pw.Text(currencyFormat.format(subtotal), style: const pw.TextStyle(fontSize: 14)),
+              ]
+            ),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('SERVIÇO (10%)', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                pw.Text(currencyFormat.format(subtotal * 0.10), style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+              ]
+            ),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('TOTAL A PAGAR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                pw.Text(currencyFormat.format(subtotal * 1.10), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+              ]
+            ),
+            pw.SizedBox(height: 20),
+            pw.Center(child: pw.Text('*** OBRIGADO PELA PREFERENCIA ***', style: const pw.TextStyle(fontSize: 10))),
+          ],
+        );
+      }
+    ));
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => doc.save(),
+      name: 'Conta_Mesa_$tableNumber',
+    );
+  }
 }

@@ -10,6 +10,8 @@ import '../../screens/admin/admin_orders_screen.dart';
 import '../../screens/admin/admin_products_screen.dart';
 import '../../screens/admin/admin_sales_screen.dart';
 import '../../screens/admin/admin_settings_screen.dart';
+import '../../screens/admin/admin_tables_screen.dart';
+import '../../screens/admin/admin_billing_screen.dart';
 import '../../screens/kitchen_screen.dart';
 
 class AdminScaffold extends StatelessWidget {
@@ -273,6 +275,8 @@ class _AdminSidebarState extends State<_AdminSidebar> {
                   _buildMenuItem(context, 'Pedidos', LucideIcons.shoppingBag, '/admin-orders', widget.activeRoute == '/admin-orders'),
                   _buildMenuItem(context, 'Produtos', LucideIcons.box, '/admin-products', widget.activeRoute == '/admin-products'),
                   _buildMenuItem(context, 'Vendas', LucideIcons.barChart2, '/admin-sales', widget.activeRoute == '/admin-sales'),
+                  _buildMenuItem(context, 'Mesas (Gestão)', LucideIcons.armchair, '/admin-tables', widget.activeRoute == '/admin-tables'),
+                  _buildMenuItem(context, 'Fechamento', LucideIcons.wallet, '/admin-billing', widget.activeRoute == '/admin-billing'),
                   
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -349,6 +353,12 @@ class _AdminSidebarState extends State<_AdminSidebar> {
               break;
             case '/admin-sales':
               page = const AdminSalesScreen();
+              break;
+            case '/admin-tables':
+              page = const AdminTablesScreen();
+              break;
+            case '/admin-billing':
+              page = const AdminBillingScreen();
               break;
             case '/kitchen':
               page = const KitchenScreen();

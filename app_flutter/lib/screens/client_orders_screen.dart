@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../services/auth_service.dart';
 import '../services/app_translations.dart';
+import '../services/settings_service.dart';
 
 class ClientOrdersScreen extends StatefulWidget {
   const ClientOrdersScreen({super.key});
@@ -115,8 +116,8 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
                     final order = _orders[index];
                     final date = DateTime.parse(order['created_at']).toLocal();
                     final status = order['status'] ?? 'Unknown';
-                    final total = order['total_amount'] ?? 0.0;
-                    final currency = order['currency'] ?? 'EUR';
+                    final total = order['total_price'] ?? order['total_amount'] ?? 0.0;
+                    final currSymbol = SettingsService().getCurrencySymbol(SettingsService().currency);
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -163,7 +164,7 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
                           ],
                         ),
                         trailing: Text(
-                          NumberFormat.currency(symbol: currency).format(total),
+                          NumberFormat.currency(symbol: currSymbol).format(total),
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),

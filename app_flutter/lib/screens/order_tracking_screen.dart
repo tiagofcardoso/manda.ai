@@ -32,6 +32,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   Stream<Map<String, dynamic>>? _orderStream;
   Map<String, dynamic>? _orderData;
+  String? _actualTableNumber;
   StreamSubscription<Position>?
       _positionStreamSubscription; // For broadcasting location
   Timer? _pollingTimer; // [NEW] Polling Fallback
@@ -435,10 +436,18 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         .eq('id', _activeOrderId!)
         .map((event) => event.isNotEmpty ? event.first : {});
 
-    // Listen to the stream to update _currentStatus
     _orderStream?.listen((data) {
       if (mounted && data.containsKey('status')) {
         final newStatus = data['status'];
+
+        if (_actualTableNumber == null && data['table_id'] != null) {
+          _supabase.from('tables').select('table_number').eq('id', data['table_id']).maybeSingle().then((res) {
+            if (res != null && mounted) {
+              setState(() => _actualTableNumber = res['table_number'].toString());
+            }
+          });
+        }
+
         setState(() {
           _orderData = data;
           _currentStatus = newStatus;
@@ -570,9 +579,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       createdAt = DateTime.now();
     }
     final timeString = DateFormat('HH:mm').format(createdAt);
-    final tableNumber = orderData['table_id'] != null
-        ? 'Table ${orderData['table_id'].toString().substring(0, 2)}'
-        : 'Takeaway';
+    final tableNumber = _actualTableNumber != null
+        ? '${AppTranslations.of(context, 'table')} $_actualTableNumber'
+        : (orderData['table_id'] != null
+            ? '${AppTranslations.of(context, 'table')} ${orderData['table_id'].toString().substring(0, 2)}'
+            : 'Takeaway');
 
     // Determine Color based on status
     Color statusColor = Colors.orange;
@@ -737,7 +748,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         const Icon(LucideIcons.armchair,
                             size: 48, color: Colors.white54),
                         const SizedBox(height: 8),
-                        Text('Dine-In • Table ${orderData['table_id']}',
+                        Text('Dine-In • ${_actualTableNumber != null ? 'Mesa $_actualTableNumber' : 'Takeaway'}',
                             style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,

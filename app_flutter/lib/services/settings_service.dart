@@ -62,6 +62,25 @@ class SettingsService {
     }
   }
 
+  /// Load currency for a specific establishment (e.g. for Guests scanning a QR)
+  Future<void> loadCurrencyForEstablishment(String establishmentId) async {
+    try {
+      debugPrint('🔄 SettingsService: Loading currency for guest visiting $establishmentId...');
+      final establishment = await _supabase
+          .from('establishments')
+          .select('currency')
+          .eq('id', establishmentId)
+          .maybeSingle();
+          
+      if (establishment != null && establishment['currency'] != null) {
+        currencyNotifier.value = establishment['currency'];
+        debugPrint('💰 Guest Currency loaded: ${currencyNotifier.value}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading guest currency: $e');
+    }
+  }
+
   /// Update the establishment's currency via API
   Future<void> updateCurrency(String currency) async {
     debugPrint('💱 Updating currency to: $currency');

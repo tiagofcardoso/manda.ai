@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../services/admin_service.dart';
 import '../../services/app_translations.dart';
+import '../../services/settings_service.dart';
 import '../../utils/image_helper.dart';
 import '../../widgets/admin/admin_scaffold.dart';
 import '../../services/printer_service.dart';
@@ -24,6 +25,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  Set<String> _knownOrderIds = {};
+  bool _isFirstLoad = true;
 
   final List<String> _statusFilters = [
     'all',
@@ -70,9 +73,37 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         status: _selectedStatus == 'all' ? null : _selectedStatus,
       );
       if (mounted) {
+        if (!_isFirstLoad) {
+          for (var order in orders) {
+            final id = order['id'].toString();
+            final status = order['status'].toString();
+            if (!_knownOrderIds.contains(id) && status == 'pending') {
+              try {
+                PrinterService().printOrder(order, 'Cozinha Manda.AI');
+              } catch (e) {
+                // Prevent crash if blocked by browser
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Atenção: Novo Pedido Chegou!'),
+                  backgroundColor: Colors.green.shade700,
+                  duration: const Duration(seconds: 15),
+                  action: SnackBarAction(
+                    label: 'IMPRIMIR MANUALMENTE',
+                    textColor: Colors.white,
+                    onPressed: () => PrinterService().printOrder(order, 'Cozinha Manda.AI'),
+                  ),
+                ),
+              );
+            }
+          }
+        }
+        
         setState(() {
           _orders = orders;
           _isLoading = false;
+          _knownOrderIds = orders.map((e) => e['id'].toString()).toSet();
+          _isFirstLoad = false;
         });
       }
     } catch (e) {
@@ -387,19 +418,25 @@ class _OrderCard extends StatelessWidget {
     return Container(
       // margin: const EdgeInsets.only(bottom: 12), // Handled by GridView spacing
       decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
+        color: isDark ? statusColor.withOpacity(0.1) : statusColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.black.withOpacity(0.05),
+          color: statusColor.withOpacity(isDark ? 0.3 : 0.4),
+          width: 1.5,
         ),
         boxShadow: isDark
-            ? []
+            ? [
+                BoxShadow(
+                  color: statusColor.withOpacity(0.05),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 4),
+                )
+              ]
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
+                  color: statusColor.withOpacity(0.1),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -521,7 +558,7 @@ class _OrderCard extends StatelessWidget {
                       },
                     ),
                     Text(
-                      NumberFormat.currency(symbol: '€').format(total),
+                      NumberFormat.currency(symbol: SettingsService().getCurrencySymbol(SettingsService().currency)).format(total),
                       style: const TextStyle(
                         color: Colors.green,
                         fontWeight: FontWeight.bold,

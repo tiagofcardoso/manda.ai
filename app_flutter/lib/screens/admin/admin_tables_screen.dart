@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../widgets/admin/admin_scaffold.dart';
 
 class AdminTablesScreen extends StatefulWidget {
   const AdminTablesScreen({super.key});
@@ -232,33 +233,24 @@ class _AdminTablesScreenState extends State<AdminTablesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-        elevation: 0,
-        title: Text(
-          'Gestão de Mesas',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ElevatedButton.icon(
-              icon: const Icon(LucideIcons.plus, size: 18),
-              label: const Text('Nova Mesa'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE63946),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: _addTable,
+    return AdminScaffold(
+      title: 'Gestão de Mesas',
+      activeRoute: '/admin-tables',
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12, top: 12, bottom: 12),
+          child: ElevatedButton.icon(
+            icon: const Icon(LucideIcons.plus, size: 18),
+            label: const Text('Nova Mesa'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE63946),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
+            onPressed: _addTable,
           ),
-        ],
-      ),
+        ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _tables.isEmpty

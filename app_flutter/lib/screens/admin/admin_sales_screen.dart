@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+import '../../services/settings_service.dart';
 import '../../services/app_translations.dart';
 import '../../constants/api.dart';
 import '../../widgets/admin/admin_scaffold.dart';
@@ -150,13 +151,13 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
                           _totalOrders / 50.0), // Mock max goal 50
                       _buildGaugeItem(
                           AppTranslations.of(context, 'revenue').toUpperCase(),
-                          "€${_totalRevenue.toStringAsFixed(0)}",
+                          "${SettingsService().getCurrencySymbol(SettingsService().currency)}${_totalRevenue.toStringAsFixed(0)}",
                           (_totalRevenue / 500.0)
                               .clamp(0.0, 1.0)), // Mock max goal 500
                       _buildGaugeItem(
                           AppTranslations.of(context, 'avgTicket')
                               .toUpperCase(),
-                          "€${_avgTicket.toStringAsFixed(1)}",
+                          "${SettingsService().getCurrencySymbol(SettingsService().currency)}${_avgTicket.toStringAsFixed(1)}",
                           (_avgTicket / 20.0).clamp(0.0, 1.0)),
                     ],
                   ),

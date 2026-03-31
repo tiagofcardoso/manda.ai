@@ -53,6 +53,8 @@ class _MenuScreenState extends State<MenuScreen> {
     final estId = _cartService.establishmentId;
     if (estId != null) {
       try {
+        await SettingsService().loadCurrencyForEstablishment(estId);
+
         final res = await _supabase
             .from('establishments')
             .select('name, type')

@@ -129,4 +129,8 @@ class CartService {
     await prefs.remove('table_id');
     await prefs.remove('is_explicit_table_mode');
   }
+
+  void clearCartItemsOnly() {
+    itemsNotifier.value = [];
+  }
 }
