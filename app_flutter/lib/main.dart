@@ -20,11 +20,20 @@ import 'constants/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // NOTE: Hardcoding credentials to bypass Flutter Web 'assets/.env' 500 error.
-  // We can switch back to dotenv for mobile builds later.
-
-  const supabaseUrl = 'https://jpysitnnnopomrgjbaxq.supabase.co';
-  const supabaseKey = 'sb_publishable_2ydfHF0FqCYOr5ZQ5NZ4QQ_UUDvboCo';
+  // Credentials are injected at build time via --dart-define.
+  // For local dev, the default values below are used automatically.
+  // For CI/CD or production builds, inject via:
+  //   flutter build web \
+  //     --dart-define=SUPABASE_URL=https://... \
+  //     --dart-define=SUPABASE_ANON_KEY=sb_publishable_...
+  const supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://jpysitnnnopomrgjbaxq.supabase.co',
+  );
+  const supabaseKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'sb_publishable_2ydfHF0FqCYOr5ZQ5NZ4QQ_UUDvboCo',
+  );
 
   if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
     debugPrint("CRITICAL: Supabase credentials missing!");
@@ -36,6 +45,7 @@ Future<void> main() async {
       anonKey: supabaseKey,
     );
   }
+
 
   // Initialize Services with Persistence
   await CartService().init();
