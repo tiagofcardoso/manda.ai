@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-url = "https://jpysitnnnopomrgjbaxq.supabase.co"
-key = "sb_publishable_2ydfHF0FqCYOr5ZQ5NZ4QQ_UUDvboCo" 
+url = os.environ.get("SUPABASE_URL", "")
+key = os.environ.get("SUPABASE_ANON_KEY", os.environ.get("SUPABASE_PUBLISHABLE_KEY", ""))
 service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", key)
 
 supabase = create_client(url, service_key)

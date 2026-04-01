@@ -1,29 +1,16 @@
 import os
 from supabase import create_client, Client
-
-# Hardcoded credentials from main.dart / previous context or .env
-url = "https://jpysitnnnopomrgjbaxq.supabase.co"
-key = "sb_publishable_2ydfHF0FqCYOr5ZQ5NZ4QQ_UUDvboCo" 
-# NOTE: We need the SERVICE_ROLE_KEY to execute SQL or modify constraints/functions properly 
-# if we are not the owner, but these are RPCs. 
-# Usually, we need the SERVICE_ROLE_KEY to create functions.
-# If I don't have the service role key, I can't apply schema changes from a script unless 
-# I have a dashboard or higher privilige user.
-#
-# BUT! The user previously successfully created endpoints and likely has the .env file with SERVICE_ROLE_KEY.
-# Let's try to load from .env
-
 from dotenv import load_dotenv
+
 load_dotenv()
 
-# If load_dotenv works, we use os.environ
+# Load from .env — never hardcode credentials
+url = os.environ.get("SUPABASE_URL", "")
+key = os.environ.get("SUPABASE_ANON_KEY", os.environ.get("SUPABASE_PUBLISHABLE_KEY", ""))
 service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-if not service_key:
-    # Fallback to the known publishable key if service key is missing, 
-    # BUT publishable key cannot create functions usually.
-    # Let's hope the user has the .env file set up as per main.py.
-    print("WARNING: SUPABASE_SERVICE_ROLE_KEY not found in .env. Using fallback (might fail for DDL).")
-    service_key = key 
+
+if not url or not service_key:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env")
 
 supabase: Client = create_client(url, service_key)
 
