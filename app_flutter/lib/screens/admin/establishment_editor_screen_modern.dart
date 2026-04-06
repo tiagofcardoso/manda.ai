@@ -492,18 +492,20 @@ class _EstablishmentEditorScreenModernState
                             placeholder: _t('adminEmail'),
                           ),
                           const SizedBox(height: 16),
-                          // Password Field (Only for new establishments/admins)
-                          if (widget.establishment == null)
-                            AdminBottomLineTextField(
-                              controller: _passwordController,
-                              icon: LucideIcons.lock,
-                              placeholder: 'Senha Inicial (Opcional)',
-                              obscureText: true,
-                            ),
+                          AdminBottomLineTextField(
+                            controller: _passwordController,
+                            icon: LucideIcons.lock,
+                            placeholder: widget.establishment == null
+                                ? 'Senha Inicial (Opcional)'
+                                : 'Nova Senha Temporária (Opcional)',
+                            obscureText: true,
+                          ),
                           Padding(
                             padding: const EdgeInsets.only(left: 36, top: 4),
                             child: Text(
-                              _t('adminEmailHint'),
+                              widget.establishment == null
+                                  ? _t('adminEmailHint')
+                                  : 'Deixe em branco para não alterar a senha.',
                               style: const TextStyle(
                                   fontSize: 11, color: Colors.grey),
                             ),

@@ -46,10 +46,14 @@ class PrinterService {
     final doc = pw.Document();
     
     // Safety checks for order properties
-    final List<dynamic> items = order['cart_items'] is List ? List.from(order['cart_items']) : [];
-    final double total = double.tryParse((order['total_amount'] ?? 0).toString()) ?? 0.0;
+    // order_items from Supabase join; fall back to cart_items for legacy compatibility
+    final List<dynamic> items = order['order_items'] is List
+        ? List.from(order['order_items'])
+        : (order['cart_items'] is List ? List.from(order['cart_items']) : []);
+    final double total = double.tryParse((order['total'] ?? order['total_amount'] ?? 0).toString()) ?? 0.0;
     final String orderId = (order['id'] ?? 'N/A').toString();
-    final String? tableId = order['table_id']?.toString();
+    // Prefer resolved table_number over raw UUID
+    final String? tableNumber = order['tables']?['table_number']?.toString() ?? order['table_id']?.toString();
     final String? address = order['delivery_address']?.toString();
     final bool isDelivery = address != null && address.isNotEmpty;
     
@@ -72,11 +76,11 @@ class PrinterService {
             pw.Text('Data: ${dateFormat.format(DateTime.now())}'),
             pw.SizedBox(height: 8),
 
-            if (tableId != null) 
+            if (tableNumber != null)
               pw.Container(
                 padding: const pw.EdgeInsets.all(4),
                 decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
-                child: pw.Text('MESA: $tableId', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                child: pw.Text('MESA: $tableNumber', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
               ),
             if (isDelivery) 
               pw.Container(
@@ -89,8 +93,10 @@ class PrinterService {
             pw.Divider(),
             ...items.map((item) {
               final num qty = item['quantity'] ?? 1;
-              final String name = item['products']?['name'] ?? 'Item';
-              final double price = double.tryParse((item['price_at_time'] ?? 0).toString()) ?? 0.0;
+              final String name = item['products']?['name'] ?? item['name'] ?? 'Item';
+              final double price = double.tryParse(
+                (item['products']?['price'] ?? item['price_at_time'] ?? item['price'] ?? 0).toString()
+              ) ?? 0.0;
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 4),
                 child: pw.Row(

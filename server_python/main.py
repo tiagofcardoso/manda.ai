@@ -807,6 +807,18 @@ async def create_establishment_admin(
                 if u.email == email:
                     user_id = u.id
                     break
+            
+            # If a specific password was provided, update it for the existing user
+            if request.password and user_id:
+                print(f"Updating password for existing user: {email}")
+                supabase_admin.auth.admin.update_user_by_id(
+                    user_id,
+                    {"password": request.password}
+                )
+                # Force must_change_password = True so user changes on next login
+                supabase_admin.from_('profiles').update(
+                    {'must_change_password': True, 'welcome_shown': False}
+                ).eq('id', user_id).execute()
         
         if not user_id:
             raise HTTPException(status_code=500, detail="Failed to retrieve User ID")

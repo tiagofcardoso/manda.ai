@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api.dart';
 
 class OrderService {
@@ -9,22 +10,31 @@ class OrderService {
   factory OrderService() => _instance;
   OrderService._internal();
 
+  static const String _kOrderIdKey = 'active_table_order_id';
+
   final ValueNotifier<String?> currentOrderIdNotifier = ValueNotifier(null);
 
   String? get currentOrderId => currentOrderIdNotifier.value;
 
-  // Initialize (no-op for now, OrderService doesn't persist)
+  /// Load persisted order ID from storage (survives app navigation & refresh)
   Future<void> init() async {
-    // Guest order persistence was reverted
-    // Table sessions are now handled by CartService
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_kOrderIdKey);
+    if (saved != null) {
+      currentOrderIdNotifier.value = saved;
+    }
   }
 
-  void setOrderId(String orderId) {
+  Future<void> setOrderId(String orderId) async {
     currentOrderIdNotifier.value = orderId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kOrderIdKey, orderId);
   }
 
-  void clearOrder() {
+  Future<void> clearOrder() async {
     currentOrderIdNotifier.value = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kOrderIdKey);
   }
 
   Future<Map<String, dynamic>> placeTableOrder(

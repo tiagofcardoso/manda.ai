@@ -120,7 +120,7 @@ class AuthService {
 
   /// Sign Out
   Future<void> signOut() async {
-    OrderService().clearOrder();
+    await OrderService().clearOrder();
     await _supabase.auth.signOut();
     try {
       await GoogleSignIn().signOut();

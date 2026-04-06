@@ -288,8 +288,8 @@ class _CheckoutAreaState extends State<_CheckoutArea> {
     }
   }
 
-  void _handleSuccess(String orderId) {
-    OrderService().setOrderId(orderId);
+  Future<void> _handleSuccess(String orderId) async {
+    await OrderService().setOrderId(orderId);
     if (widget.cartService.tableId != null) {
        widget.cartService.clearCartItemsOnly(); // Keep table context alive
     } else {
