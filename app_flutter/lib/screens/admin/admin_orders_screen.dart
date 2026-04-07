@@ -346,6 +346,21 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ),
               ),
             )
+          else if (_selectedStatus == null || _selectedStatus == 'all')
+            SliverFillRemaining(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildKanbanColumn('pending', 'Pedidos Recebidos', isDark, textColor),
+                    _buildKanbanColumn('prep', 'Preparando', isDark, textColor),
+                    _buildKanbanColumn('ready', 'Pronto para retirar', isDark, textColor),
+                    _buildKanbanColumn('on_way', 'Saiu para entrega', isDark, textColor),
+                  ],
+                ),
+              ),
+            )
           else
             SliverPadding(
               padding: const EdgeInsets.all(16),
@@ -371,6 +386,87 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKanbanColumn(String status, String title, bool isDark, Color? textColor) {
+    final columnOrders = _filteredOrders.where((o) => o['status'] == status).toList();
+    
+    return Container(
+      width: 320,
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Column Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${columnOrders.length}',
+                    style: TextStyle(
+                      color: _getStatusColor(status),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Column Items
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: columnOrders.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final order = columnOrders[index];
+                return _OrderCard(
+                  order: order,
+                  onTap: () => _showOrderDetails(order),
+                  getStatusColor: _getStatusColor,
+                  getStatusIcon: _getStatusIcon,
+                  getStatusLabel: _getStatusLabel,
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -412,8 +508,20 @@ class _OrderCard extends StatelessWidget {
     final isDelivery = orderType == 'delivery';
 
     final tableNumber = order['tables'] != null
-        ? order['tables']['table_number']
+        ? 'Mesa ${order['tables']['table_number']}'
         : (isDelivery ? 'Delivery' : 'Takeaway');
+        
+    final typeColor = isDelivery 
+        ? Colors.blue 
+        : Colors.orange;
+
+    final typeBgColor = isDelivery 
+        ? Colors.blue.withOpacity(isDark ? 0.2 : 0.1)
+        : Colors.orange.withOpacity(isDark ? 0.2 : 0.1);
+
+    final typeTextColor = isDelivery 
+        ? (isDark ? Colors.blue[300] : Colors.blue[700])
+        : (isDark ? Colors.orange[300] : Colors.orange[800]);
 
     return Container(
       // margin: const EdgeInsets.only(bottom: 12), // Handled by GridView spacing
@@ -507,9 +615,7 @@ class _OrderCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : Colors.black.withOpacity(0.05),
+                        color: typeBgColor,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
@@ -520,14 +626,14 @@ class _OrderCard extends StatelessWidget {
                                 ? LucideIcons.bike
                                 : LucideIcons.utensilsCrossed,
                             size: 12,
-                            color: textColor,
+                            color: typeTextColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             tableNumber.toString(),
                             style: TextStyle(
-                              color: textColor,
-                              fontWeight: FontWeight.w600,
+                              color: typeTextColor,
+                              fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
                           ),
