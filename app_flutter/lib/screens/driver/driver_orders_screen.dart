@@ -8,7 +8,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../services/app_translations.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/app_drawer.dart'; // [NEW]
+import '../../services/backend_heartbeat_service.dart';
+import '../../widgets/app_drawer.dart'; 
+import 'package:geolocator/geolocator.dart'; // [NEW] GPS
+import 'dart:async'; // [NEW] Timer
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -27,10 +30,14 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
   String? _userRole;
   bool _roleLoading = true;
   List<Map<String, dynamic>> _drivers = [];
+  StreamSubscription<Position>? _positionSubscription; // [NEW] GPS Stream
+  StreamSubscription<List<Map<String, dynamic>>>? _myDeliveriesSubscription;
+  List<Map<String, dynamic>> _currentMyDeliveries = []; // [NEW] Cache
 
   @override
   void initState() {
     super.initState();
+    BackendHeartbeatService().start();
     _tabController = TabController(length: 2, vsync: this);
 
     final userId = _supabase.auth.currentUser?.id;
@@ -54,6 +61,60 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
         .order('updated_at', ascending: false);
 
     _fetchRoleAndDrivers();
+    
+    // [NEW] Listen to my deliveries to auto-start GPS if in_progress
+    _myDeliveriesSubscription = _myDeliveriesStream.listen((list) {
+      _currentMyDeliveries = list;
+      _checkAndToggleGps(list);
+    });
+  }
+
+  void _checkAndToggleGps(List<Map<String, dynamic>> list) {
+    final hasInProgress = list.any((d) => d['status'] == 'in_progress');
+    if (hasInProgress && _positionSubscription == null) {
+      _startGpsBroadcasting();
+    } else if (!hasInProgress && _positionSubscription != null) {
+      _stopGpsBroadcasting();
+    }
+  }
+
+  Future<void> _startGpsBroadcasting() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 20, // Reduced frequency to save battery
+    );
+
+    _positionSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
+      // Update ALL my in_progress deliveries
+      for (var d in _currentMyDeliveries) {
+        if (d['status'] == 'in_progress') {
+          _supabase.from('deliveries').update({
+            'current_lat': position.latitude,
+            'current_lng': position.longitude,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', d['id']);
+        }
+      }
+    }, onError: (error) {
+      debugPrint('GPS stream error: $error');
+    });
+    debugPrint('GPS Broadcasting Started');
+  }
+
+  void _stopGpsBroadcasting() {
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+    debugPrint('GPS Broadcasting Stopped');
   }
 
   Future<void> _fetchRoleAndDrivers() async {
@@ -81,6 +142,9 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
 
   @override
   void dispose() {
+    BackendHeartbeatService().stop();
+    _myDeliveriesSubscription?.cancel();
+    _stopGpsBroadcasting();
     _tabController.dispose();
     super.dispose();
   }
@@ -258,6 +322,8 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
             ),
           );
         }
+        // Force immediate check (though stream listener will also catch it)
+        _loadOrdersManually(); 
       } else {
         throw Exception('Failed to update status server: ${response.statusCode} - ${response.body}');
       }
@@ -293,6 +359,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
       debugPrint('Error fetching order details via HTTP: $e');
       return {'debug_error': e.toString()};
     }
+  }
+
+  Future<void> _loadOrdersManually() async {
+     _fetchRoleAndDrivers();
   }
 
   @override
@@ -428,12 +498,11 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
           // Block 'Accept' until Kitchen marks as READY (user request)
           final canAccept = orderStatus.toString().toLowerCase() == 'ready';
 
-          // Debug Dropoff Reason
+          // Unified dropoff source: orders.delivery_address
           String dropoffAddr = 'Unknown Dropoff';
-          // ... (existing address logic) ...
-          final snapshotAddr = data['delivery_address'];
+          final snapshotAddr = data['delivery_address']?.toString().trim();
           if (snapshotAddr != null &&
-              snapshotAddr.toString().isNotEmpty &&
+              snapshotAddr.isNotEmpty &&
               snapshotAddr != 'Table Service' &&
               snapshotAddr != 'Rua Exemplo 123') {
             dropoffAddr = snapshotAddr;
@@ -441,13 +510,14 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen>
             dropoffAddr = 'Unknown Client (Guest)';
           } else if (profile != null) {
             final street = profile['street'];
+            final number = profile['number'];
             final city = profile['city'];
-            if (street != null) dropoffAddr = '$street, $city';
-          }
-
-          // Fallback if we still don't have address but delivery table has it
-          if (dropoffAddr == 'Unknown Dropoff' && delivery['address'] != null) {
-            dropoffAddr = delivery['address'];
+            if (street != null) {
+              final numberPart = (number != null && number.toString().trim().isNotEmpty)
+                  ? ', ${number.toString().trim()}'
+                  : '';
+              dropoffAddr = '$street$numberPart, $city';
+            }
           }
 
           final pickupAddr = est != null

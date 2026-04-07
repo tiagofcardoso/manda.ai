@@ -41,8 +41,17 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
           .order('created_at', ascending: false);
 
       if (mounted) {
+        final mapped = List<Map<String, dynamic>>.from(response);
+        mapped.sort((a, b) {
+          final aDate = DateTime.tryParse((a['created_at'] ?? '').toString());
+          final bDate = DateTime.tryParse((b['created_at'] ?? '').toString());
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return bDate.compareTo(aDate);
+        });
         setState(() {
-          _orders = List<Map<String, dynamic>>.from(response);
+          _orders = mapped;
           _isLoading = false;
         });
       }
@@ -109,9 +118,10 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
+              : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _orders.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 0),
                   itemBuilder: (context, index) {
                     final order = _orders[index];
                     final date = DateTime.parse(order['created_at']).toLocal();
@@ -120,6 +130,7 @@ class _ClientOrdersScreenState extends State<ClientOrdersScreen> {
                     final currSymbol = SettingsService().getCurrencySymbol(SettingsService().currency);
 
                     return Card(
+                      key: ValueKey(order['id']),
                       margin: const EdgeInsets.only(bottom: 16),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),

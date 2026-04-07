@@ -1,5 +1,8 @@
 import json
 import re
+import os
+import asyncio
+import httpx
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
@@ -18,6 +21,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def start_heartbeat():
+    async def ping_self():
+        # Render sets RENDER_EXTERNAL_URL, fallback to the known url
+        url = os.environ.get("RENDER_EXTERNAL_URL", "https://manda-ai.onrender.com")
+        while True:
+            await asyncio.sleep(600)  # Wait 10 minutes (600 seconds)
+            try:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💓 Sending heartbeat ping to {url}")
+                async with httpx.AsyncClient() as client:
+                    await client.get(url, timeout=10.0)
+            except Exception as e:
+                print(f"Heartbeat failed: {e}")
+
+    asyncio.create_task(ping_self())
 
 @app.get("/")
 def read_root():

@@ -207,15 +207,11 @@ class _ProductEditorScreenModernState extends State<ProductEditorScreenModern> {
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
         'image_url': _imageController.text.trim(),
         'is_available': true,
-        // IF selected category is 'custom_other' OR a string key (not UUID), send as custom_category
-        // For now, assuming all keys in APP_CATEGORIES are string keys, NOT UUIDs.
-        // So we should always send category_id as null and key as custom_category
-        // UNLESS the backend logic changes to support lookup by key.
-        // But to be safe and fix the error:
-        'category_id': null,
+        // Fix: Properly map category UUID to category_id, using custom_category only when 'custom_other'
+        'category_id': _selectedCategory == 'custom_other' ? null : _selectedCategory,
         'custom_category': _selectedCategory == 'custom_other'
             ? _customCategoryController.text.trim()
-            : _selectedCategory,
+            : null,
       });
 
       final url = widget.product != null

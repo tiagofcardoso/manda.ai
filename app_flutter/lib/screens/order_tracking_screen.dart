@@ -3,9 +3,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 
 import '../services/auth_service.dart';
+import '../services/backend_heartbeat_service.dart';
 import '../services/order_service.dart';
 import 'package:intl/intl.dart';
 
@@ -28,9 +28,11 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   String? _activeOrderId;
   String _currentStatus = 'pending'; // pending, prep, ready, completed
+  String? _deliveryStatus;
   RealtimeChannel? _subscription;
   final SupabaseClient _supabase = Supabase.instance.client;
   Stream<Map<String, dynamic>>? _orderStream;
+  StreamSubscription<Map<String, dynamic>>? _orderStreamSubscription;
   Map<String, dynamic>? _orderData;
   String? _actualTableNumber;
   StreamSubscription<Position>?
@@ -42,14 +44,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   LatLng? _driverLocation;
   LatLng?
       _destinationLocation; // Mock for now, or fetch from order if address exists
-  // Mock Shop Location (e.g., Lisbon Center)
-  LatLng _shopLocation =
-      const LatLng(38.7223, -9.1393); // Default Lisbon Center
+  LatLng? _shopLocation;
   bool _isMapReady = false;
+  List<String> _trackedOrderIds = [];
 
   @override
   void initState() {
     super.initState();
+    BackendHeartbeatService().start();
     _activeOrderId = widget.orderId ?? OrderService().currentOrderId;
 
     // If we have an order ID, start tracking
@@ -98,6 +100,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final orderId = widget.orderId ?? OrderService().currentOrderId;
     if (orderId != null) {
       if (mounted) setState(() => _activeOrderId = orderId);
+      _refreshTrackedOrders();
       _fetchInitialStatus();
       _subscribeToOrderUpdates();
 
@@ -113,6 +116,60 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       // Start Polling Fallback (1s)
       _startPolling();
     }
+  }
+
+  Future<void> _refreshTrackedOrders() async {
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        final rows = await _supabase
+            .from('orders')
+            .select('id')
+            .eq('user_id', user.id)
+            .neq('status', 'delivered')
+            .neq('status', 'cancelled')
+            .neq('status', 'completed')
+            .order('created_at', ascending: false)
+            .limit(10);
+        final ids = List<Map<String, dynamic>>.from(rows)
+            .map((e) => (e['id'] ?? '').toString())
+            .where((id) => id.isNotEmpty)
+            .toList();
+        if (_activeOrderId != null && !ids.contains(_activeOrderId)) {
+          ids.insert(0, _activeOrderId!);
+        }
+        if (ids.isNotEmpty) {
+          if (mounted) setState(() => _trackedOrderIds = ids);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // Guest/local fallback
+    final local = OrderService().recentOrderIds.toList();
+    if (_activeOrderId != null && !local.contains(_activeOrderId)) {
+      local.insert(0, _activeOrderId!);
+    }
+    if (mounted) setState(() => _trackedOrderIds = local);
+  }
+
+  void _switchToOrder(String orderId) {
+    if (orderId == _activeOrderId) return;
+    setState(() {
+      _activeOrderId = orderId;
+      _currentStatus = 'pending';
+      _deliveryStatus = null;
+      _shopLocation = null;
+      _driverLocation = null;
+      _destinationLocation = null;
+      _orderData = null;
+      _isMapReady = false;
+    });
+    _subscription?.unsubscribe();
+    _fetchInitialStatus();
+    _subscribeToOrderUpdates();
+    _fetchShopLocation();
+    _fetchDropoffLocation();
   }
 
   void _startPolling() {
@@ -132,20 +189,25 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           .maybeSingle();
 
       if (response != null && mounted) {
-        final newStatus = response['status'];
+        final newStatus = response['status']?.toString() ?? 'pending';
+        final resolvedStatus = _resolveDisplayStatus(newStatus);
         // Update if status changed or data refreshed
-        if (newStatus != _currentStatus || _orderData == null) {
+        if (resolvedStatus != _currentStatus || _orderData == null) {
           print("Polling: Status updated to $newStatus");
           setState(() {
             _orderData = response;
-            _currentStatus = newStatus;
+            _currentStatus = resolvedStatus;
           });
 
           // Handle Auto-Close
-          if (newStatus == 'delivered') {
+          if (resolvedStatus == 'delivered') {
             Future.delayed(const Duration(seconds: 3), () {
               if (mounted) {
-                OrderService().clearOrder();
+                if (_activeOrderId != null) {
+                  OrderService().removeOrderFromHistory(_activeOrderId!);
+                } else {
+                  OrderService().clearOrder();
+                }
                 setState(() => _activeOrderId = null);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -181,6 +243,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         setState(() {
           _activeOrderId = response['id'];
         });
+        _refreshTrackedOrders();
 
         // Load Details for this restored order
         _fetchInitialStatus();
@@ -257,53 +320,114 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     if (_activeOrderId == null) return;
     try {
       // 1. Get Establishment ID from Order
-      final order = await _supabase
+      final orderRes = await _supabase
           .from('orders')
           .select('establishment_id')
           .eq('id', _activeOrderId!)
-          .single();
+          .maybeSingle();
 
-      final estId = order['establishment_id'];
+      final estId = orderRes?['establishment_id'];
       if (estId == null) return;
 
-      // 2. Fetch Establishment Address
+      // 2. Fetch Establishment Address AND COORDS
       final est = await _supabase
           .from('establishments')
-          .select('street, city, country') // Removed postcode
+          .select('id, name, street, number, city, state, zip_code, country, latitude, longitude')
           .eq('id', estId)
           .single();
 
-      final street = est['street'];
-      final city = est['city'];
-      final country = est['country'] ?? 'Brasil'; // Fallback to Brasil or keep dynamic
-
-      if (street != null && city != null) {
-        // 3. Geocode
-        final addressQuery =
-            '$street, $city, $country'; 
-        final url = Uri.parse(
-            'https://nominatim.openstreetmap.org/search?q=$addressQuery&format=json&limit=1');
-        final response = await http
-            .get(url, headers: {'User-Agent': 'Manda.AI_DriverApp/1.0'});
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data is List && data.isNotEmpty) {
-            final lat = double.parse(data[0]['lat']);
-            final lon = double.parse(data[0]['lon']);
-            if (mounted) {
-              setState(() {
-                _shopLocation = LatLng(lat, lon);
-              });
-              // Auto-fit will be called by other location updates or map ready
-              _fitMapBounds();
-            }
-          }
+      // OPTIMIZATION: Use stored coordinates if available
+      if (est['latitude'] != null && est['longitude'] != null) {
+        final double lat = double.parse(est['latitude'].toString());
+        final double lng = double.parse(est['longitude'].toString());
+        if (_isLikelyBrazilCoordinate(lat, lng) && mounted) {
+          setState(() {
+            _shopLocation = LatLng(lat, lng);
+          });
+          _fitMapBounds();
+          return; // Skip geocoding
         }
+      }
+
+      final street = est['street'];
+      final name = est['name']?.toString().trim();
+      final number = est['number']?.toString().trim();
+      final city = est['city'];
+      final state = est['state']?.toString().trim();
+      final zipCode = est['zip_code']?.toString().trim();
+      final country = est['country'] ?? 'Brasil';
+
+      // 3. Geocode fallback with multiple candidates to improve hit-rate.
+      final geocodeCandidates = <String>[
+        if (street != null && city != null)
+          [
+            street.toString(),
+            if (number != null && number.isNotEmpty) number,
+            city.toString(),
+            if (state != null && state.isNotEmpty) state,
+            if (zipCode != null && zipCode.isNotEmpty) zipCode,
+            country.toString(),
+          ].join(', '),
+        if (name != null && name.isNotEmpty && city != null)
+          [
+            name,
+            city.toString(),
+            if (state != null && state.isNotEmpty) state,
+            country.toString(),
+          ].join(', '),
+        if (city != null)
+          [
+            city.toString(),
+            if (state != null && state.isNotEmpty) state,
+            country.toString(),
+          ].join(', '),
+      ];
+
+      final geocoded = await _geocodeFirstMatch(geocodeCandidates);
+      if (geocoded != null) {
+        final lat = geocoded.latitude;
+        final lon = geocoded.longitude;
+        if (mounted) {
+          setState(() {
+            _shopLocation = LatLng(lat, lon);
+          });
+          _fitMapBounds();
+        }
+
+        // Best effort cache to avoid repeated geocoding in future sessions.
+        // If RLS blocks this update for clients, we safely ignore.
+        try {
+          await _supabase.from('establishments').update({
+            'latitude': lat,
+            'longitude': lon,
+          }).eq('id', est['id']);
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('Error fetching shop location: $e');
     }
+  }
+
+  Future<LatLng?> _geocodeFirstMatch(List<String> candidates) async {
+    for (final candidate in candidates) {
+      final trimmed = candidate.trim();
+      if (trimmed.isEmpty) continue;
+      try {
+        final addressQuery = Uri.encodeComponent(trimmed);
+        final url = Uri.parse(
+            'https://nominatim.openstreetmap.org/search?q=$addressQuery&format=json&limit=1&countrycodes=br');
+        final response = await http
+            .get(url, headers: {'User-Agent': 'Manda.AI_App/1.1'});
+        if (response.statusCode != 200) continue;
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) {
+          final lat = double.tryParse(data[0]['lat'].toString());
+          final lon = double.tryParse(data[0]['lon'].toString());
+          if (lat != null && lon != null) return LatLng(lat, lon);
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   // === DRIVER: GPS BROADCASTING ===
@@ -361,7 +485,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   void _fitMapBounds() {
     if (!_isMapReady) return;
 
-    final points = <LatLng>[_shopLocation]; // Always include shop
+    final points = <LatLng>[];
+    if (_shopLocation != null) points.add(_shopLocation!);
 
     // Include Driver ONLY if visible (Not pending/prep)
     if (_driverLocation != null &&
@@ -405,7 +530,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   void dispose() {
+    BackendHeartbeatService().stop();
     _positionStreamSubscription?.cancel();
+    _orderStreamSubscription?.cancel();
     _pollingTimer?.cancel();
     OrderService().currentOrderIdNotifier.removeListener(_onOrderServiceChange);
     _subscription?.unsubscribe();
@@ -414,15 +541,23 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   void _onOrderServiceChange() {
     final newId = OrderService().currentOrderId;
+    _refreshTrackedOrders();
     if (newId != _activeOrderId) {
       setState(() {
         _activeOrderId = newId;
         _currentStatus = 'pending'; // Reset status for new order
+        _deliveryStatus = null;
+        _shopLocation = null;
+        _driverLocation = null;
+        _destinationLocation = null;
       });
       _subscription?.unsubscribe();
       if (newId != null) {
+        _refreshTrackedOrders();
         _fetchInitialStatus();
-        // _subscribeToOrderUpdates(); // This might be replaced by the stream
+        _subscribeToOrderUpdates();
+        _fetchShopLocation();
+        _fetchDropoffLocation();
       }
     }
   }
@@ -436,9 +571,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         .eq('id', _activeOrderId!)
         .map((event) => event.isNotEmpty ? event.first : {});
 
-    _orderStream?.listen((data) {
+    _orderStreamSubscription?.cancel();
+    _orderStreamSubscription = _orderStream?.listen((data) {
       if (mounted && data.containsKey('status')) {
-        final newStatus = data['status'];
+        final newStatus = data['status']?.toString() ?? 'pending';
 
         if (_actualTableNumber == null && data['table_id'] != null) {
           _supabase.from('tables').select('table_number').eq('id', data['table_id']).maybeSingle().then((res) {
@@ -450,14 +586,18 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
         setState(() {
           _orderData = data;
-          _currentStatus = newStatus;
+          _currentStatus = _resolveDisplayStatus(newStatus);
         });
 
         // Auto-Close if Delivered
-        if (newStatus == 'delivered') {
+        if (_currentStatus == 'delivered') {
           Future.delayed(const Duration(seconds: 3), () {
             if (mounted) {
-              OrderService().clearOrder();
+              if (_activeOrderId != null) {
+                OrderService().removeOrderFromHistory(_activeOrderId!);
+              } else {
+                OrderService().clearOrder();
+              }
               setState(() => _activeOrderId = null);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -469,7 +609,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           });
         }
       }
-    }).onError((error) {
+    })?..onError((error) {
       debugPrint('Error listening to order stream: $error');
     });
   }
@@ -477,10 +617,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   // Subscribe to DELIVERY updates for this order
   void _subscribeToOrderUpdates() {
     if (_activeOrderId == null) return;
+    _subscription?.unsubscribe();
     // Note: Order Status changes are now handled by _orderStream in _fetchInitialStatus
 
     // 2. Delivery Location Updates (listen to DB changes)
-    _supabase
+    _subscription = _supabase
         .channel('public:deliveries:$_activeOrderId')
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
@@ -494,6 +635,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           callback: (payload) {
             final newLat = payload.newRecord['current_lat'];
             final newLng = payload.newRecord['current_lng'];
+            final deliveryStatus = payload.newRecord['status']?.toString();
             if (newLat != null && newLng != null) {
               final lat = (newLat as num).toDouble();
               final lng = (newLng as num).toDouble();
@@ -501,6 +643,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 if (mounted) {
                   setState(() {
                     _driverLocation = LatLng(lat, lng);
+                    _deliveryStatus = deliveryStatus ?? _deliveryStatus;
+                    _currentStatus = _resolveDisplayStatus(_orderData?['status']?.toString());
                   });
                   // Auto-Pan to keep driver in view (optional, or just fit bounds)
                   // For now, let's fit bounds only if users haven't interacted much,
@@ -511,6 +655,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   _fitMapBounds();
                 }
               }
+            } else if (deliveryStatus != null && mounted) {
+              setState(() {
+                _deliveryStatus = deliveryStatus;
+                _currentStatus = _resolveDisplayStatus(_orderData?['status']?.toString());
+              });
             }
           },
         )
@@ -532,14 +681,32 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         if (mounted) {
           setState(() {
             _driverLocation = LatLng(data['current_lat'], data['current_lng']);
+            _deliveryStatus = data['status']?.toString();
+            _currentStatus = _resolveDisplayStatus(_orderData?['status']?.toString());
           });
           // Fit bounds after initial load
           _fitMapBounds();
         }
+      } else if (data != null && mounted) {
+        setState(() {
+          _deliveryStatus = data['status']?.toString();
+          _currentStatus = _resolveDisplayStatus(_orderData?['status']?.toString());
+        });
       }
     } catch (e) {
       debugPrint('Error fetching delivery loc: $e');
     }
+  }
+
+  String _resolveDisplayStatus(String? orderStatus) {
+    final delivery = _deliveryStatus?.toLowerCase();
+    if (delivery == 'in_progress' || delivery == 'assigned') return 'on_way';
+    if (delivery == 'delivered') return 'delivered';
+    return (orderStatus ?? 'pending').toLowerCase();
+  }
+
+  bool _isLikelyBrazilCoordinate(double lat, double lng) {
+    return lat >= -34.0 && lat <= 6.0 && lng >= -75.0 && lng <= -28.0;
   }
 
   @override
@@ -617,6 +784,27 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           children: [
             Text('Order #${_activeOrderId!.substring(0, 8)}',
                 style: const TextStyle(color: Colors.white54)),
+            if (_trackedOrderIds.length > 1) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _trackedOrderIds.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final id = _trackedOrderIds[index];
+                    final selected = id == _activeOrderId;
+                    final label = '#${id.substring(0, id.length > 6 ? 6 : id.length)}';
+                    return ChoiceChip(
+                      selected: selected,
+                      label: Text(label),
+                      onSelected: (_) => _switchToOrder(id),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
 
             // KDS Style Card
@@ -638,34 +826,33 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             top: Radius.circular(12)),
                         child: Stack(
                           children: [
-                            FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-                                initialCenter: _shopLocation, // Start at shop
-                                initialZoom: 14.5,
-                                onMapReady: () {
-                                  _isMapReady = true;
-                                  _fitMapBounds();
-                                },
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate:
-                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName: 'com.manda.client',
-                                  tileProvider:
-                                      CancellableNetworkTileProvider(),
+                            if (_shopLocation != null)
+                              FlutterMap(
+                                mapController: _mapController,
+                                options: MapOptions(
+                                  initialCenter: _shopLocation!,
+                                  initialZoom: 14.5,
+                                  onMapReady: () {
+                                    _isMapReady = true;
+                                    _fitMapBounds();
+                                  },
                                 ),
-                                MarkerLayer(
-                                  markers: [
-                                    // Shop Marker
-                                    Marker(
-                                      point: _shopLocation,
-                                      width: 40,
-                                      height: 40,
-                                      child: const Icon(LucideIcons.store,
-                                          color: Colors.blue, size: 30),
-                                    ),
+                                children: [
+                                 TileLayer(
+                                   urlTemplate:
+                                       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                   userAgentPackageName: 'com.manda.client',
+                                 ),
+                                  MarkerLayer(
+                                    markers: [
+                                      // Shop Marker
+                                      Marker(
+                                        point: _shopLocation!,
+                                        width: 40,
+                                        height: 40,
+                                        child: const Icon(LucideIcons.store,
+                                            color: Colors.blue, size: 30),
+                                      ),
                                     // Driver Marker
                                     if (_driverLocation != null &&
                                         _currentStatus != 'pending' &&
@@ -696,10 +883,19 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                         child: const Icon(LucideIcons.mapPin,
                                             color: Colors.orange, size: 40),
                                       ),
-                                  ],
+                                    ],
+                                  ),
+                                ],
+                              )
+                            else
+                              Container(
+                                color: Colors.black12,
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'Carregando localização da loja...',
+                                  style: TextStyle(color: Colors.white70),
                                 ),
-                              ],
-                            ),
+                              ),
                             // Overlay Status
                             if (_currentStatus != 'pending' &&
                                 _currentStatus != 'prep')
@@ -716,13 +912,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                   child: Row(
                                     children: [
                                       if (_driverLocation == null)
-                                        const Text(
-                                            'Waiting for driver assignment...',
-                                            style: TextStyle(
+                                        Text(
+                                            _currentStatus == 'on_way'
+                                                ? 'Entregador a caminho (aguardando GPS)...'
+                                                : 'Aguardando atribuicao do entregador...',
+                                            style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 12))
                                       else
-                                        const Text('Driver on the way! 🛵',
+                                        const Text('Entregador a caminho!',
                                             style: TextStyle(
                                                 color: Colors.greenAccent,
                                                 fontSize: 12,

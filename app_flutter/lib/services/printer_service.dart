@@ -31,13 +31,24 @@ class PrinterService {
 
   Future<bool> printOrder(Map<String, dynamic> order, String establishmentName) async {
     try {
+      debugPrint('PrinterService: Starting print for order ${order['id']}');
+      
       // Hardware thermal printer code would go here using flutter_thermal_printer_pos
       // Since hardware might not be available during this execution, we use the PDF fallback
       // which fulfills the web and native printing requirements perfectly using the 'printing' package.
+      
+      // Safety check: ensure we have at least ID and some data
+      if (order['id'] == null) {
+        debugPrint('PrinterService Error: Order ID is null');
+        return false;
+      }
+
       await _printPdfFallback(order, establishmentName);
+      debugPrint('PrinterService: Successfully sent to system print dialog');
       return true;
-    } catch (e) {
-      debugPrint('Error printing order: $e');
+    } catch (e, stack) {
+      debugPrint('PrinterService CRASH: $e');
+      debugPrint('Stack trace: $stack');
       return false;
     }
   }
@@ -46,10 +57,10 @@ class PrinterService {
     final doc = pw.Document();
     
     // Safety checks for order properties
-    // order_items from Supabase join; fall back to cart_items for legacy compatibility
-    final List<dynamic> items = order['order_items'] is List
-        ? List.from(order['order_items'])
-        : (order['cart_items'] is List ? List.from(order['cart_items']) : []);
+    final items = _normalizeItems(
+      _extractRawItems(order),
+      orderTotal: double.tryParse((order['total'] ?? order['total_amount'] ?? 0).toString()) ?? 0.0,
+    );
     final double total = double.tryParse((order['total'] ?? order['total_amount'] ?? 0).toString()) ?? 0.0;
     final String orderId = (order['id'] ?? 'N/A').toString();
     // Prefer resolved table_number over raw UUID
@@ -93,10 +104,8 @@ class PrinterService {
             pw.Divider(),
             ...items.map((item) {
               final num qty = item['quantity'] ?? 1;
-              final String name = item['products']?['name'] ?? item['name'] ?? 'Item';
-              final double price = double.tryParse(
-                (item['products']?['price'] ?? item['price_at_time'] ?? item['price'] ?? 0).toString()
-              ) ?? 0.0;
+              final String name = item['name'] ?? 'Item';
+              final double price = item['price'] ?? 0.0;
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 4),
                 child: pw.Row(
@@ -153,14 +162,17 @@ class PrinterService {
             pw.SizedBox(height: 10),
             pw.Divider(),
             ...orders.expand((order) {
-              final List<dynamic> items = order['order_items'] ?? order['cart_items'] ?? [];
+              final items = _normalizeItems(
+                _extractRawItems(order),
+                orderTotal: double.tryParse((order['total'] ?? order['total_amount'] ?? 0).toString()) ?? 0.0,
+              );
               final orderId = (order['id'] ?? '').toString();
               return [
                 pw.Text('Pedido #${orderId.substring(0, orderId.length > 6 ? 6 : orderId.length)}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                 ...items.map((item) {
                   final num qty = item['quantity'] ?? 1;
-                  final String name = item['products']?['name'] ?? item['name'] ?? 'Item';
-                  final double price = double.tryParse((item['products']?['price'] ?? item['price_at_time'] ?? item['price'] ?? 0).toString()) ?? 0.0;
+                  final String name = item['name'] ?? 'Item';
+                  final double price = item['price'] ?? 0.0;
                   return pw.Container(
                     margin: const pw.EdgeInsets.only(bottom: 4),
                     child: pw.Row(
@@ -208,5 +220,117 @@ class PrinterService {
       onLayout: (PdfPageFormat format) async => doc.save(),
       name: 'Conta_Mesa_$tableNumber',
     );
+  }
+
+  List<dynamic> _extractRawItems(Map<String, dynamic> order) {
+    final sources = [
+      order['order_items'],
+      order['items'],
+      order['cart_items'],
+    ];
+    for (final source in sources) {
+      if (source is List) return List<dynamic>.from(source);
+    }
+    return const <dynamic>[];
+  }
+
+  List<Map<String, dynamic>> _normalizeItems(
+    List<dynamic> rawItems, {
+    double orderTotal = 0.0,
+  }) {
+    final normalized = <Map<String, dynamic>>[];
+    for (final raw in rawItems) {
+      if (raw is! Map) continue;
+      final item = Map<String, dynamic>.from(raw);
+      final product = item['products'] is Map
+          ? Map<String, dynamic>.from(item['products'])
+          : (item['product'] is Map ? Map<String, dynamic>.from(item['product'] as Map) : const <String, dynamic>{});
+
+      final qty = item['quantity'] is num
+          ? item['quantity'] as num
+          : (num.tryParse((item['quantity'] ?? item['qty'] ?? 1).toString()) ?? 1);
+
+      final originalName = (product['name'] ??
+              item['name'] ??
+              item['product_name'] ??
+              item['title'] ??
+              item['product_title'] ??
+              'Item')
+          .toString();
+      // Print default Helvetica only supports Latin1. Strip emojis and special characters.
+      final name = originalName.replaceAll(RegExp(r'[^\x00-\x7F\u00C0-\u00FF]'), '').trim();
+      final price = _extractItemPrice(item, product, qty);
+
+      normalized.add({
+        'quantity': qty,
+        'name': name,
+        'price': price,
+      });
+    }
+
+    // Last-resort fallback: if we have total but every item is zero, split by quantity.
+    final hasKnownPrice = normalized.any((e) => (e['price'] as double) > 0);
+    if (!hasKnownPrice && orderTotal > 0) {
+      final totalQty = normalized.fold<num>(0, (sum, e) => sum + ((e['quantity'] as num?) ?? 0));
+      if (totalQty > 0) {
+        final unit = orderTotal / totalQty;
+        for (final item in normalized) {
+          item['price'] = unit;
+        }
+      }
+    }
+
+    return normalized;
+  }
+
+  double _extractItemPrice(
+    Map<String, dynamic> item,
+    Map<String, dynamic> product,
+    num qty,
+  ) {
+    final directCandidates = <dynamic>[
+      item['price_at_time'],
+      item['unit_price'],
+      item['unitPrice'],
+      item['price'],
+      item['value'],
+      item['product_price'],
+      item['products_price'],
+      item['preco'],
+      product['price'],
+      product['value'],
+      product['preco'],
+    ];
+    for (final candidate in directCandidates) {
+      final parsed = _parseMoney(candidate);
+      if (parsed != null && parsed > 0) return parsed;
+    }
+
+    final lineCandidates = <dynamic>[
+      item['line_total'],
+      item['subtotal'],
+      item['total'],
+      item['amount'],
+      item['total_price'],
+      item['price_total'],
+    ];
+    for (final candidate in lineCandidates) {
+      final parsed = _parseMoney(candidate);
+      if (parsed != null && parsed > 0 && qty > 0) return parsed / qty;
+    }
+
+    return 0.0;
+  }
+
+  double? _parseMoney(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return null;
+    final cleaned = raw.replaceAll(RegExp(r'[^0-9,.\-]'), '');
+    final normalized = cleaned.contains(',') && !cleaned.contains('.')
+        ? cleaned.replaceAll(',', '.')
+        : cleaned.replaceAll(',', '');
+    return double.tryParse(normalized);
   }
 }

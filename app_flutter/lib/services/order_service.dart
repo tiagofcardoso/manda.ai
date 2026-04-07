@@ -11,15 +11,19 @@ class OrderService {
   OrderService._internal();
 
   static const String _kOrderIdKey = 'active_table_order_id';
+  static const String _kOrderHistoryKey = 'recent_order_ids';
 
   final ValueNotifier<String?> currentOrderIdNotifier = ValueNotifier(null);
+  List<String> _recentOrderIds = [];
 
   String? get currentOrderId => currentOrderIdNotifier.value;
+  List<String> get recentOrderIds => List.unmodifiable(_recentOrderIds);
 
   /// Load persisted order ID from storage (survives app navigation & refresh)
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_kOrderIdKey);
+    _recentOrderIds = prefs.getStringList(_kOrderHistoryKey) ?? [];
     if (saved != null) {
       currentOrderIdNotifier.value = saved;
     }
@@ -29,12 +33,33 @@ class OrderService {
     currentOrderIdNotifier.value = orderId;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kOrderIdKey, orderId);
+    _recentOrderIds.remove(orderId);
+    _recentOrderIds.insert(0, orderId);
+    if (_recentOrderIds.length > 20) {
+      _recentOrderIds = _recentOrderIds.take(20).toList();
+    }
+    await prefs.setStringList(_kOrderHistoryKey, _recentOrderIds);
   }
 
   Future<void> clearOrder() async {
     currentOrderIdNotifier.value = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kOrderIdKey);
+  }
+
+  Future<void> removeOrderFromHistory(String orderId) async {
+    _recentOrderIds.remove(orderId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kOrderHistoryKey, _recentOrderIds);
+    if (currentOrderIdNotifier.value == orderId) {
+      currentOrderIdNotifier.value =
+          _recentOrderIds.isNotEmpty ? _recentOrderIds.first : null;
+      if (currentOrderIdNotifier.value == null) {
+        await prefs.remove(_kOrderIdKey);
+      } else {
+        await prefs.setString(_kOrderIdKey, currentOrderIdNotifier.value!);
+      }
+    }
   }
 
   Future<Map<String, dynamic>> placeTableOrder(

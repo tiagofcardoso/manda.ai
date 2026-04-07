@@ -38,6 +38,7 @@ class _MenuScreenState extends State<MenuScreen> {
   Map<String, dynamic>? _establishment;
   List<Map<String, dynamic>> _dbCategories = [];
   late final StreamSubscription<AuthState> _authSubscription;
+  Offset _cartPosition = const Offset(20, 100);
 
   @override
   void initState() {
@@ -424,7 +425,13 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Product>>(
+      body: ValueListenableBuilder<List<CartItem>>(
+        valueListenable: CartService().itemsNotifier,
+        builder: (context, items, _) {
+          final count = items.fold(0, (sum, item) => sum + item.quantity);
+          return Stack(
+            children: [
+              FutureBuilder<List<Product>>(
         future: _fetchProducts(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -450,7 +457,7 @@ class _MenuScreenState extends State<MenuScreen> {
           // Get available product category IDs
           final availableProductCatIds = {
             ...allProducts
-                .map((p) => p.categoryId)
+                .map((p) => p.categoryId ?? p.customCategory)
                 .where((id) => id != null)
                 .cast<String>()
           };
@@ -488,7 +495,7 @@ class _MenuScreenState extends State<MenuScreen> {
           final filteredProducts = _selectedCategory == 'all'
               ? allProducts
               : allProducts
-                  .where((p) => p.categoryId == _selectedCategory)
+                  .where((p) => (p.categoryId ?? p.customCategory) == _selectedCategory)
                   .toList();
 
           return Center(
@@ -504,7 +511,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Olá, O que você\ngostaria de pedir?",
+                          "Olá, Oque manda?",
                           style: TextStyle(
                             fontSize: Responsive.isMobile(context) ? 28 : 36,
                             fontWeight: FontWeight.w800,
@@ -638,57 +645,60 @@ class _MenuScreenState extends State<MenuScreen> {
           );
         },
       ),
-      floatingActionButton: ValueListenableBuilder<List<CartItem>>(
-        valueListenable: CartService().itemsNotifier,
-        builder: (context, items, _) {
-          final count = items.fold(0, (sum, item) => sum + item.quantity);
-          if (count == 0) return const SizedBox.shrink();
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 80.0), // Raise above nav bar
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                FloatingActionButton(
-                  backgroundColor: const Color(0xFFE63946),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const CartScreen()),
-                    );
-                  },
-                  child:
-                      const Icon(LucideIcons.shoppingBag, color: Colors.white),
-                ),
+              if (count > 0)
                 Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: const Color(0xFFE63946), width: 2),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
-                    ),
-                    child: Text(
-                      '$count',
-                      style: const TextStyle(
-                        color: Color(0xFFE63946),
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
+                  right: _cartPosition.dx,
+                  bottom: _cartPosition.dy,
+                  child: GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        // Positioned depends on right/bottom, so we subtract delta
+                        _cartPosition = Offset(
+                          (_cartPosition.dx - details.delta.dx).clamp(0.0, MediaQuery.of(context).size.width - 60.0),
+                          (_cartPosition.dy - details.delta.dy).clamp(0.0, MediaQuery.of(context).size.height - 100.0),
+                        );
+                      });
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        FloatingActionButton(
+                          backgroundColor: const Color(0xFFE63946),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const CartScreen()),
+                            );
+                          },
+                          child: const Icon(LucideIcons.shoppingBag, color: Colors.white),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFE63946), width: 2),
+                            ),
+                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                            child: Text(
+                              '$count',
+                              style: const TextStyle(
+                                color: Color(0xFFE63946),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+            ],
           );
         },
       ),
@@ -698,8 +708,10 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildProductCard(BuildContext context, Product product) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Stack(
-      clipBehavior: Clip.none,
+    return GestureDetector(
+      onTap: () => _showExpandedCard(context, product),
+      child: Stack(
+        clipBehavior: Clip.none,
       children: [
         // Background Card
         Positioned.fill(
@@ -845,7 +857,129 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 
+  void _showExpandedCard(BuildContext context, Product product) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: SingleChildScrollView(
+              child: Container(
+                width: Responsive.isMobile(context) ? MediaQuery.of(context).size.width * 0.85 : 400,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Hero(
+                      tag: 'product_image_${product.id}', 
+                      child: Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            )
+                          ],
+                          border: Border.all(color: Colors.white, width: 4),
+                          image: DecorationImage(
+                            image: _getImageForProduct(product),
+                            fit: BoxFit.cover, 
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      product.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      product.description ?? 'Delicioso e fresquinho',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        ValueListenableBuilder<String>(
+                          valueListenable: SettingsService().currencyNotifier,
+                          builder: (context, currency, _) {
+                            final symbol = SettingsService().getCurrencySymbol(currency);
+                            return Flexible(
+                              child: Text(
+                                '$symbol ${product.price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            if (_isLoadingRole) return;
+                            final currentUser = AuthService().currentUser;
+                            final isTableMode = CartService().tableId != null;
+
+                            if (currentUser == null && !isTableMode) {
+                              Navigator.pop(ctx);
+                              Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminLoginScreen()));
+                              return;
+                            }
+                            if (currentUser != null && _userRole != 'client') return;
+
+                            _cartService.addToCart(product);
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Adicionado ao carrinho!'), duration: Duration(seconds: 1)),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(LucideIcons.plus, color: Colors.white, size: 24),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    );
+  }
 }
