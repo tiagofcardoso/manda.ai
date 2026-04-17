@@ -10,8 +10,32 @@ import '../services/app_translations.dart';
 import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  final Map<String, TextEditingController> _controllers = {};
+  final Set<String> _expandedItems = {};
+
+  @override
+  void dispose() {
+    for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _getController(CartItem item) {
+    final key = item.product.id;
+    if (!_controllers.containsKey(key)) {
+      _controllers[key] = TextEditingController(text: item.notes);
+    }
+    return _controllers[key]!;
+  }
 
   @override
   @override
@@ -48,7 +72,11 @@ class CartScreen extends StatelessWidget {
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    return Container(
+                    final isExpanded = _expandedItems.contains(item.product.id);
+                    final controller = _getController(item);
+
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
                       margin: const EdgeInsets.symmetric(
                           vertical: 4, horizontal: 16),
                       decoration: BoxDecoration(
@@ -64,80 +92,145 @@ class CartScreen extends StatelessWidget {
                               ],
                       ),
                       padding: const EdgeInsets.all(8.0),
-                      child: Row(
+                      child: Column(
                         children: [
-                          // Product Image Thumbnail
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: 60,
-                              height: 60,
-                              color:
-                                  isDark ? Colors.grey[800] : Colors.grey[200],
-                              child: item.product.imageUrl != null &&
-                                      item.product.imageUrl!.isNotEmpty
-                                  ? Image.network(item.product.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Icon(
-                                          LucideIcons.image,
-                                          color: isDark
-                                              ? Colors.white24
-                                              : Colors.grey))
-                                  : Icon(LucideIcons.utensils,
-                                      color: isDark
-                                          ? Colors.white24
-                                          : Colors.grey),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (isExpanded) {
+                                  _expandedItems.remove(item.product.id);
+                                } else {
+                                  _expandedItems.add(item.product.id);
+                                }
+                              });
+                            },
+                            child: Row(
                               children: [
-                                Text(item.product.name,
-                                    style: TextStyle(
-                                        color: textColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  NumberFormat.currency(symbol: SettingsService().getCurrencySymbol(SettingsService().currency))
-                                      .format(item.total),
-                                  style: const TextStyle(
-                                      color: Color(0xFFE63946),
-                                      fontWeight: FontWeight.bold),
+                                // Product Image Thumbnail
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: 60,
+                                    height: 60,
+                                    color: isDark
+                                        ? Colors.grey[800]
+                                        : Colors.grey[200],
+                                    child: item.product.imageUrl != null &&
+                                            item.product.imageUrl!.isNotEmpty
+                                        ? Image.network(item.product.imageUrl!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                                LucideIcons.image,
+                                                color: isDark
+                                                    ? Colors.white24
+                                                    : Colors.grey))
+                                        : Icon(LucideIcons.utensils,
+                                            color: isDark
+                                                ? Colors.white24
+                                                : Colors.grey),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(item.product.name,
+                                          style: TextStyle(
+                                              color: textColor,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16)),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            NumberFormat.currency(
+                                                    symbol: SettingsService()
+                                                        .getCurrencySymbol(
+                                                            SettingsService()
+                                                                .currency))
+                                                .format(item.total),
+                                            style: const TextStyle(
+                                                color: Color(0xFFE63946),
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          if (item.notes != null &&
+                                              item.notes!.isNotEmpty)
+                                            Icon(LucideIcons.stickyNote,
+                                                size: 14, color: Colors.orange),
+                                        ],
+                                      ),
+                                      Text(
+                                        isExpanded
+                                            ? 'Esconder observação'
+                                            : (item.notes?.isEmpty ?? true)
+                                                ? 'Adicionar observação'
+                                                : 'Editar observação',
+                                        style: TextStyle(
+                                            color: Colors.grey, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Quantity Controls
+                                Container(
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.white10
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                          icon: Icon(LucideIcons.minus,
+                                              size: 16, color: textColor),
+                                          onPressed: () => cartService
+                                              .updateQuantity(item, -1)),
+                                      Text('${item.quantity}',
+                                          style: TextStyle(
+                                              color: textColor,
+                                              fontWeight: FontWeight.bold)),
+                                      IconButton(
+                                          icon: Icon(LucideIcons.plus,
+                                              size: 16, color: textColor),
+                                          onPressed: () => cartService
+                                              .updateQuantity(item, 1)),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          // Quantity Controls
-                          Container(
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
+                          if (isExpanded) ...[
+                            const Divider(height: 16),
+                            TextField(
+                              controller: controller,
+                              autofocus: true,
+                              style: TextStyle(color: textColor, fontSize: 14),
+                              maxLines: 2,
+                              decoration: InputDecoration(
+                                hintText: 'Ex: Retirar cebola, mal passado...',
+                                hintStyle: TextStyle(
+                                    color: textColor?.withOpacity(0.4)),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                      color:
+                                          textColor?.withOpacity(0.1) ?? Colors.grey),
+                                ),
+                                contentPadding: const EdgeInsets.all(12),
+                              ),
+                              onChanged: (val) {
+                                item.notes = val;
+                              },
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                    icon: Icon(LucideIcons.minus,
-                                        size: 16, color: textColor),
-                                    onPressed: () =>
-                                        cartService.updateQuantity(item, -1)),
-                                Text('${item.quantity}',
-                                    style: TextStyle(
-                                        color: textColor,
-                                        fontWeight: FontWeight.bold)),
-                                IconButton(
-                                    icon: Icon(LucideIcons.plus,
-                                        size: 16, color: textColor),
-                                    onPressed: () =>
-                                        cartService.updateQuantity(item, 1)),
-                              ],
-                            ),
-                          ),
+                          ],
                         ],
                       ),
                     );

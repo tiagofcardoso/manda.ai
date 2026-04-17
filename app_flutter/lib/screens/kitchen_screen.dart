@@ -458,12 +458,33 @@ class _OrderCard extends StatelessWidget {
             child: Column(
               children: items.map((item) {
                 final product = item['products'];
-                return Row(
-                  children: [
-                    Text('${item['quantity']}x', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(product?['name'] ?? 'Item')),
-                  ],
+                final notes = item['notes']?.toString();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('${item['quantity']}x', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(product?['name'] ?? 'Item', style: const TextStyle(fontWeight: FontWeight.w500))),
+                        ],
+                      ),
+                      if (notes != null && notes.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 28),
+                          child: Text(
+                            'Obs: $notes',
+                            style: const TextStyle(
+                                color: Colors.orange,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                    ],
+                  ),
                 );
               }).toList(),
             ),
