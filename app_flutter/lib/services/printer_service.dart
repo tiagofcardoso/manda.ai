@@ -187,7 +187,16 @@ class PrinterService {
                     child: pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Expanded(child: pw.Text('${qty}x $name', style: const pw.TextStyle(fontSize: 12))),
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('${qty}x $name', style: const pw.TextStyle(fontSize: 12)),
+                              if (item['notes'] != null && item['notes'].toString().isNotEmpty)
+                                pw.Text('Obs: ${item['notes']}', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                            ]
+                          )
+                        ),
                         pw.Text(currencyFormat.format(price * qty), style: const pw.TextStyle(fontSize: 12)),
                       ]
                     )
@@ -270,11 +279,16 @@ class PrinterService {
       final name = originalName.replaceAll(RegExp(r'[^\x00-\x7F\u00C0-\u00FF]'), '').trim();
       final price = _extractItemPrice(item, product, qty);
 
+      final notesValue = item['notes']?.toString();
+      final safeNotes = notesValue != null 
+          ? notesValue.replaceAll(RegExp(r'[^\x00-\x7F\u00C0-\u00FF]'), '').trim()
+          : null;
+
       normalized.add({
         'quantity': qty,
         'name': name,
         'price': price,
-        'notes': item['notes'],
+        'notes': safeNotes,
       });
     }
 
